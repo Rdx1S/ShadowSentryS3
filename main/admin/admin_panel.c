@@ -61,7 +61,7 @@ static void serve_attacks_json(int sock)
 {
     attack_log_t entries[50];
     int n     = log_store_get_recent(entries, 50);
-    int total = log_store_total_count();
+    uint32_t total = log_store_total_count();
 
     uint32_t seen_ips[50];
     int      unique = 0;
@@ -79,8 +79,8 @@ static void serve_attacks_json(int sock)
     static char json[8192];
     int pos = 0;
     pos += snprintf(json + pos, sizeof(json) - pos,
-        "{\"total\":%d,\"unique_ips\":%d,\"by_type\":[%d,%d,%d],\"entries\":[",
-        total, unique, by_type[0], by_type[1], by_type[2]);
+        "{\"total\":%lu,\"unique_ips\":%d,\"by_type\":[%d,%d,%d],\"entries\":[",
+        (unsigned long)total, unique, by_type[0], by_type[1], by_type[2]);
 
     for (int i = 0; i < n && pos < (int)sizeof(json) - 256; i++) {
         if (i > 0) json[pos++] = ',';
