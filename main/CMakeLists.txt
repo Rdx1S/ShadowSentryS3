@@ -1,0 +1,28 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "wifi_manager.c"
+        "honeypot/rtsp_trap.c"
+        "honeypot/http_trap.c"
+        "honeypot/telnet_trap.c"
+        "admin/admin_panel.c"
+        "admin/telegram.c"
+        "storage/log_store.c"
+    INCLUDE_DIRS
+        "."
+        "honeypot"
+        "admin"
+        "storage"
+    EMBED_TXTFILES
+        "index.html"
+    REQUIRES
+        nvs_flash
+        esp_wifi
+        esp_netif
+        esp_event
+        lwip
+        spiffs
+        mbedtls
+        esp_http_client
+        esp_timer
+)
