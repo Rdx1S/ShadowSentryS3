@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShadowSentry S3</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#c9d1d9;font-family:'Segoe UI',system-ui,monospace;min-height:100vh}
+header{background:#161b22;border-bottom:1px solid #30363d;padding:14px 24px;display:flex;align-items:center;gap:12px}
+.logo{font-size:1.4rem}
+header h1{font-size:1.1rem;color:#f0883e;letter-spacing:.5px}
+.chip{font-size:.68rem;background:#21262d;border:1px solid #30363d;padding:2px 9px;border-radius:20px;color:#8b949e}
+.chip.live{color:#3fb950;border-color:#238636}
+.container{max-width:1200px;margin:24px auto;padding:0 16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:24px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px 20px}
+.card h3{font-size:.72rem;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+.card .val{font-size:2rem;font-weight:700;color:#f0883e;line-height:1}
+.card .sub{font-size:.72rem;color:#8b949e;margin-top:5px}
+.section{background:#161b22;border:1px solid #30363d;border-radius:8px;overflow:hidden}
+.section-hdr{padding:14px 18px;border-bottom:1px solid #30363d;display:flex;justify-content:space-between;align-items:center}
+.section-hdr h2{font-size:.9rem;color:#c9d1d9}
+.btn{background:#21262d;border:1px solid #30363d;color:#c9d1d9;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:.78rem}
+.btn:hover{background:#30363d}
+.btn-danger{border-color:#da3633;color:#f85149}
+.btn-danger:hover{background:#1f1010}
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+th{background:#0d1117;color:#8b949e;text-align:left;padding:9px 16px;font-weight:500;border-bottom:1px solid #21262d;white-space:nowrap}
+td{padding:9px 16px;border-bottom:1px solid #161b22;vertical-align:middle}
+tr:hover td{background:#1c2128}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:.68rem;font-weight:700}
+.r{background:#1f3d2e;color:#3fb950;border:1px solid #238636}
+.h{background:#1b2f4a;color:#58a6ff;border:1px solid #388bfd}
+.t{background:#3d2318;color:#f0883e;border:1px solid #c9510c}
+.ip{color:#79c0ff;font-family:monospace}
+.cred{color:#d2a8ff;font-family:monospace}
+.ts{color:#8b949e;font-size:.72rem;white-space:nowrap}
+.empty{text-align:center;color:#8b949e;padding:40px;font-size:.85rem}
+.hdr-btns{display:flex;gap:8px}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">&#128737;</span>
+  <h1>ShadowSentry S3</h1>
+  <span class="chip">ESP32-S3 HoneyPot</span>
+  <span class="chip live" id="status">&#9679; ACTIVE</span>
+</header>
+<div class="container">
+  <div class="stats">
+    <div class="card"><h3>Total Attacks</h3><div class="val" id="s-total">—</div><div class="sub">All time</div></div>
+    <div class="card"><h3>Unique IPs</h3><div class="val" id="s-ips">—</div><div class="sub">Distinct attackers</div></div>
+    <div class="card"><h3>RTSP &#128249;</h3><div class="val" id="s-rtsp">—</div><div class="sub">Port 554 · Mirai bots</div></div>
+    <div class="card"><h3>HTTP &#127760;</h3><div class="val" id="s-http">—</div><div class="sub">Port 80 · Fake Hikvision</div></div>
+    <div class="card"><h3>Telnet &#128187;</h3><div class="val" id="s-telnet">—</div><div class="sub">Port 23 · Bruteforce</div></div>
+  </div>
+  <div class="section">
+    <div class="section-hdr">
+      <h2>Attack Log</h2>
+      <div class="hdr-btns">
+        <button class="btn" onclick="load()">&#8635; Refresh</button>
+        <button class="btn btn-danger" onclick="clearLogs()">&#128465; Clear</button>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Source IP</th>
+          <th>Protocol</th>
+          <th>Credentials</th>
+          <th>Payload</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="5" class="empty">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+function ip4(n){return[(n>>>0)&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255].join('.')}
+const BADGE=['<span class="badge r">RTSP</span>','<span class="badge h">HTTP</span>','<span class="badge t">TELNET</span>'];
+
+async function load(){
+  try{
+    const r=await fetch('/api/attacks');
+    if(!r.ok)throw new Error(r.status);
+    const d=await r.json();
+    document.getElementById('s-total').textContent=d.total;
+    document.getElementById('s-ips').textContent=d.unique_ips;
+    document.getElementById('s-rtsp').textContent=d.by_type[0]??0;
+    document.getElementById('s-http').textContent=d.by_type[1]??0;
+    document.getElementById('s-telnet').textContent=d.by_type[2]??0;
+    const tb=document.getElementById('tbody');
+    if(!d.entries||!d.entries.length){
+      tb.innerHTML='<tr><td colspan="5" class="empty">No attacks recorded yet — your network is clean &#10003;</td></tr>';
+      return;
+    }
+    tb.innerHTML=d.entries.map(e=>`
+      <tr>
+        <td class="ts">${new Date(e.ts*1000).toLocaleString()}</td>
+        <td class="ip">${ip4(e.ip)}</td>
+        <td>${BADGE[e.type]||'?'}</td>
+        <td class="cred">${e.user?`${e.user}:${e.pass}`:'—'}</td>
+        <td style="color:#8b949e;font-size:.72rem;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.payload||''}</td>
+      </tr>`).join('');
+  }catch(e){
+    document.getElementById('tbody').innerHTML='<tr><td colspan="5" class="empty" style="color:#f85149">&#9888; Failed to load — check connection</td></tr>';
+    document.getElementById('status').textContent='⬤ OFFLINE';
+    document.getElementById('status').style.color='#f85149';
+  }
+}
+
+async function clearLogs(){
+  if(!confirm('Clear all attack logs from flash?'))return;
+  await fetch('/api/clear',{method:'POST'});
+  load();
+}
+
+load();
+setInterval(load,10000);
+</script>
+</body>
+</html>
