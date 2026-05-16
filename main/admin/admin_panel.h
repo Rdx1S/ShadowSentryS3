@@ -10,6 +10,7 @@
  * Endpoints:
  *   GET  /              → 200  text/html   embedded dashboard (index.html)
  *   GET  /api/attacks   → 200  application/json  recent attack log + stats
+ *   GET  /api/status    → 200  application/json  device health (uptime_s/free_heap/rssi)
  *   POST /api/clear     → 204  wipe flash log
  *   *                   → 401  if credentials missing or wrong
  *
