@@ -6,6 +6,9 @@
 #include "lwip/sockets.h"
 #include "lwip/inet.h"
 #include "esp_log.h"
+#include "esp_system.h"
+#include "esp_timer.h"
+#include "esp_wifi.h"
 #include "mbedtls/base64.h"
 #include <stdbool.h>
 #include <string.h>
@@ -105,6 +108,31 @@ static void send_404(int sock)
 }
 
 // ── Route handlers ────────────────────────────────────────────────────────────
+
+static void serve_status_json(int sock)
+{
+    int8_t rssi = 0;
+    wifi_ap_record_t ap = {0};
+    if (esp_wifi_sta_get_ap_info(&ap) == ESP_OK)
+        rssi = ap.rssi;
+
+    char json[128];
+    int len = snprintf(json, sizeof(json),
+        "{\"uptime_s\":%llu,\"free_heap\":%lu,\"rssi\":%d}",
+        (unsigned long long)(esp_timer_get_time() / 1000000ULL),
+        (unsigned long)esp_get_free_heap_size(),
+        (int)rssi);
+
+    char hdr[160];
+    int hdr_len = snprintf(hdr, sizeof(hdr),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: application/json\r\n"
+        "Content-Length: %d\r\n"
+        "Connection: close\r\n\r\n",
+        len);
+    send(sock, hdr, hdr_len, 0);
+    send(sock, json, len, 0);
+}
 
 static void serve_dashboard(int sock)
 {
@@ -209,6 +237,8 @@ static void handle_client(int sock)
 
     if (strncmp(buf, "GET", 3) == 0 && strstr(buf, " /api/attacks")) {
         serve_attacks_json(sock);
+    } else if (strncmp(buf, "GET", 3) == 0 && strstr(buf, " /api/status")) {
+        serve_status_json(sock);
     } else if (strncmp(buf, "POST", 4) == 0 && strstr(buf, " /api/clear")) {
         log_store_clear();
         ESP_LOGI(TAG, "Logs cleared via admin panel");

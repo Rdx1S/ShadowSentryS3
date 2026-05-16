@@ -26,10 +26,6 @@
 // Short on purpose — web scanners send requests immediately.
 #define HTTP_RECV_TIMEOUT_S     5
 
-// Maximum body size read from a POST request (bytes).
-// Credentials are never longer than this in practice.
-#define HTTP_BODY_MAX           512
-
 // FreeRTOS task entry point. Pass NULL as arg.
 // Pin to Core 0 with xTaskCreatePinnedToCore().
 void http_trap_task(void *arg);

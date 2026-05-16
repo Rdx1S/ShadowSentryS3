@@ -60,6 +60,9 @@ idf_component_register(
         esp-tls             # esp_crt_bundle_attach() — wires cert bundle into
                             # esp_http_client for api.telegram.org validation
 
+        # Timer
+        esp_timer           # esp_timer_get_time() — device uptime in /api/status
+
         # HTTP client
         esp_http_client     # telegram.c — HTTPS POST to Telegram Bot API
 )

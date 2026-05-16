@@ -180,6 +180,7 @@ footer{
   font-size:.66rem;color:var(--muted);
 }
 .uptime{color:rgba(0,210,160,.6)}
+#sys-info{color:rgba(0,210,160,.5);font-family:monospace;font-size:.65rem}
 </style>
 </head>
 <body>
@@ -310,7 +311,7 @@ footer{
 <footer>
   <span>ShadowSentry S3 &nbsp;·&nbsp; ESP32-S3 &nbsp;·&nbsp; MIT License</span>
   <span class="uptime" id="uptime"></span>
-  <span>Auto-refresh every 10s</span>
+  <span id="sys-info"></span>
 </footer>
 
 </div>
@@ -433,7 +434,17 @@ async function clearLogs(){
   try{await fetch('/api/clear',{method:'POST'});_seen.clear();document.getElementById('feed').innerHTML='<div class="feed-empty">Waiting for attackers…</div>';load();}
   catch{alert('Clear failed');}
 }
-load();setInterval(load,10000);
+async function loadStatus(){
+  try{
+    const r=await fetch('/api/status');if(!r.ok)return;
+    const d=await r.json();
+    const s=d.uptime_s,p=n=>String(n).padStart(2,'0');
+    const up=`${p(Math.floor(s/3600))}:${p(Math.floor(s%3600/60))}:${p(s%60)}`;
+    document.getElementById('sys-info').textContent=
+      `Device ${up} · Heap ${(d.free_heap/1024).toFixed(0)}KB · WiFi ${d.rssi}dBm`;
+  }catch{}
+}
+load();loadStatus();setInterval(load,10000);setInterval(loadStatus,10000);
 </script>
 </body>
 </html>
