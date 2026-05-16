@@ -107,6 +107,7 @@ main{flex:1;padding:24px 28px;display:flex;flex-direction:column;gap:20px}
 .c-http  {--card-accent:var(--amber)}
 .c-telnet{--card-accent:var(--red)}
 .c-ssh   {--card-accent:#38bdf8}
+.c-ftp   {--card-accent:#34d399}
 
 /* ── Mid row ── */
 .mid-row{display:grid;grid-template-columns:280px 1fr;gap:14px}
@@ -153,6 +154,7 @@ main{flex:1;padding:24px 28px;display:flex;flex-direction:column;gap:20px}
 .fb-http  {background:rgba(251,191,36,.1); color:var(--amber);border:1px solid rgba(251,191,36,.2)}
 .fb-telnet{background:rgba(248,113,113,.1);color:var(--red); border:1px solid rgba(248,113,113,.2)}
 .fb-ssh   {background:rgba(56,189,248,.1); color:#38bdf8;   border:1px solid rgba(56,189,248,.2)}
+.fb-ftp   {background:rgba(52,211,153,.1); color:#34d399;   border:1px solid rgba(52,211,153,.2)}
 .feed-empty{color:var(--muted);font-size:.8rem;text-align:center;padding:24px 0}
 
 /* ── Table ── */
@@ -241,6 +243,12 @@ footer{
       <div class="label">SSH Hits</div>
       <div class="sub">Port 22 · Version harvest</div>
     </div>
+    <div class="stat-card c-ftp">
+      <div class="icon">&#128193;</div>
+      <div class="val" id="s-ftp">0</div>
+      <div class="label">FTP Hits</div>
+      <div class="sub">Port 21 · Fake vsFTPd</div>
+    </div>
   </div>
 
   <div class="mid-row">
@@ -254,6 +262,7 @@ footer{
           <circle id="arc-http"   cx="70" cy="70" r="54" fill="none" stroke="#fbbf24" stroke-width="16" stroke-dasharray="0 340" stroke-linecap="round"/>
           <circle id="arc-telnet" cx="70" cy="70" r="54" fill="none" stroke="#f87171" stroke-width="16" stroke-dasharray="0 340" stroke-linecap="round"/>
           <circle id="arc-ssh"    cx="70" cy="70" r="54" fill="none" stroke="#38bdf8" stroke-width="16" stroke-dasharray="0 340" stroke-linecap="round"/>
+          <circle id="arc-ftp"    cx="70" cy="70" r="54" fill="none" stroke="#34d399" stroke-width="16" stroke-dasharray="0 340" stroke-linecap="round"/>
         </svg>
         <div class="donut-center">
           <div class="dc-val" id="dc-total">0</div>
@@ -284,6 +293,12 @@ footer{
           <span class="lname">SSH</span>
           <div class="lbar"><div class="lbar-fill" id="lb-ssh" style="background:#38bdf8;width:0%"></div></div>
           <span class="lval" id="lv-ssh">0</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#34d399"></div>
+          <span class="lname">FTP</span>
+          <div class="lbar"><div class="lbar-fill" id="lb-ftp" style="background:#34d399;width:0%"></div></div>
+          <span class="lval" id="lv-ftp">0</span>
         </div>
       </div>
     </div>
@@ -339,8 +354,8 @@ function fmt(ts){
   const d=new Date(ts*1000),p=n=>String(n).padStart(2,'0');
   return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
-const BADGE=['<span class="feed-badge fb-rtsp">RTSP</span>','<span class="feed-badge fb-http">HTTP</span>','<span class="feed-badge fb-telnet">TELNET</span>','<span class="feed-badge fb-ssh">SSH</span>'];
-const ICON=['&#128249;','&#128760;','&#128187;','&#128273;'];
+const BADGE=['<span class="feed-badge fb-rtsp">RTSP</span>','<span class="feed-badge fb-http">HTTP</span>','<span class="feed-badge fb-telnet">TELNET</span>','<span class="feed-badge fb-ssh">SSH</span>','<span class="feed-badge fb-ftp">FTP</span>'];
+const ICON=['&#128249;','&#128760;','&#128187;','&#128273;','&#128193;'];
 const CIRC=2*Math.PI*54;
 
 // animated counter
@@ -358,10 +373,10 @@ function setVal(id,val){
 }
 
 // donut chart
-function updateDonut(r,h,t,sh){
-  const tot=r+h+t+sh||1,gap=4;
+function updateDonut(r,h,t,sh,f){
+  const tot=r+h+t+sh+f||1,gap=4;
   function seg(id,v,off){
-    const len=Math.max(v/tot*(CIRC-gap*4),v>0?6:0);
+    const len=Math.max(v/tot*(CIRC-gap*5),v>0?6:0);
     const el=document.getElementById(id);
     el.style.transition='stroke-dasharray .7s cubic-bezier(.4,0,.2,1),stroke-dashoffset .7s cubic-bezier(.4,0,.2,1)';
     el.setAttribute('stroke-dasharray',`${len} ${CIRC}`);
@@ -369,11 +384,11 @@ function updateDonut(r,h,t,sh){
     return len;
   }
   const l1=seg('arc-rtsp',r,0),l2=seg('arc-http',h,l1+gap);
-  const l3=seg('arc-telnet',t,l1+l2+gap*2);
-  seg('arc-ssh',sh,l1+l2+l3+gap*3);
-  setVal('dc-total',r+h+t+sh);
-  ['rtsp','http','telnet','ssh'].forEach((k,i)=>{
-    const v=[r,h,t,sh][i];
+  const l3=seg('arc-telnet',t,l1+l2+gap*2),l4=seg('arc-ssh',sh,l1+l2+l3+gap*3);
+  seg('arc-ftp',f,l1+l2+l3+l4+gap*4);
+  setVal('dc-total',r+h+t+sh+f);
+  ['rtsp','http','telnet','ssh','ftp'].forEach((k,i)=>{
+    const v=[r,h,t,sh,f][i];
     document.getElementById('lb-'+k).style.width=Math.round(v/tot*100)+'%';
     document.getElementById('lv-'+k).textContent=v;
   });
@@ -436,8 +451,8 @@ async function load(){
     const d=await r.json(),bt=d.by_type||[0,0,0],en=d.entries||[];
     setVal('s-total',d.total||0);
     setVal('s-ips',new Set(en.map(e=>e.ip)).size);
-    setVal('s-rtsp',bt[0]||0);setVal('s-http',bt[1]||0);setVal('s-telnet',bt[2]||0);setVal('s-ssh',bt[3]||0);
-    updateDonut(bt[0]||0,bt[1]||0,bt[2]||0,bt[3]||0);
+    setVal('s-rtsp',bt[0]||0);setVal('s-http',bt[1]||0);setVal('s-telnet',bt[2]||0);setVal('s-ssh',bt[3]||0);setVal('s-ftp',bt[4]||0);
+    updateDonut(bt[0]||0,bt[1]||0,bt[2]||0,bt[3]||0,bt[4]||0);
     updateFeed(en);updateTable(en);setOnline(true);
   }catch{
     setOnline(false);
