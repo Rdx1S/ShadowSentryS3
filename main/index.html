@@ -2,125 +2,438 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ShadowSentry S3</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#0d1117;color:#c9d1d9;font-family:'Segoe UI',system-ui,monospace;min-height:100vh}
-header{background:#161b22;border-bottom:1px solid #30363d;padding:14px 24px;display:flex;align-items:center;gap:12px}
-.logo{font-size:1.4rem}
-header h1{font-size:1.1rem;color:#f0883e;letter-spacing:.5px}
-.chip{font-size:.68rem;background:#21262d;border:1px solid #30363d;padding:2px 9px;border-radius:20px;color:#8b949e}
-.chip.live{color:#3fb950;border-color:#238636}
-.container{max-width:1200px;margin:24px auto;padding:0 16px}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:24px}
-.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px 20px}
-.card h3{font-size:.72rem;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
-.card .val{font-size:2rem;font-weight:700;color:#f0883e;line-height:1}
-.card .sub{font-size:.72rem;color:#8b949e;margin-top:5px}
-.section{background:#161b22;border:1px solid #30363d;border-radius:8px;overflow:hidden}
-.section-hdr{padding:14px 18px;border-bottom:1px solid #30363d;display:flex;justify-content:space-between;align-items:center}
-.section-hdr h2{font-size:.9rem;color:#c9d1d9}
-.btn{background:#21262d;border:1px solid #30363d;color:#c9d1d9;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:.78rem}
-.btn:hover{background:#30363d}
-.btn-danger{border-color:#da3633;color:#f85149}
-.btn-danger:hover{background:#1f1010}
-table{width:100%;border-collapse:collapse;font-size:.8rem}
-th{background:#0d1117;color:#8b949e;text-align:left;padding:9px 16px;font-weight:500;border-bottom:1px solid #21262d;white-space:nowrap}
-td{padding:9px 16px;border-bottom:1px solid #161b22;vertical-align:middle}
-tr:hover td{background:#1c2128}
-.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:.68rem;font-weight:700}
-.r{background:#1f3d2e;color:#3fb950;border:1px solid #238636}
-.h{background:#1b2f4a;color:#58a6ff;border:1px solid #388bfd}
-.t{background:#3d2318;color:#f0883e;border:1px solid #c9510c}
-.ip{color:#79c0ff;font-family:monospace}
-.cred{color:#d2a8ff;font-family:monospace}
-.ts{color:#8b949e;font-size:.72rem;white-space:nowrap}
-.empty{text-align:center;color:#8b949e;padding:40px;font-size:.85rem}
-.hdr-btns{display:flex;gap:8px}
+:root{
+  --bg:#03080f;
+  --surface:rgba(6,18,32,0.85);
+  --border:rgba(0,210,160,0.12);
+  --border-hi:rgba(0,210,160,0.35);
+  --g:      #00d2a0;
+  --g-dim:  rgba(0,210,160,0.15);
+  --blue:   #38bdf8;
+  --amber:  #fbbf24;
+  --red:    #f87171;
+  --purple: #a78bfa;
+  --text:   #e2e8f0;
+  --muted:  #64748b;
+  --font: 'Segoe UI',system-ui,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;overflow-x:hidden}
+
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;
+  background-image:
+    linear-gradient(rgba(0,210,160,.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,210,160,.04) 1px,transparent 1px);
+  background-size:40px 40px;
+  animation:gridpan 40s linear infinite;
+}
+@keyframes gridpan{to{background-position:40px 40px}}
+
+body::after{
+  content:'';position:fixed;inset:0;z-index:0;
+  background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(0,210,160,.06) 0%,transparent 70%);
+  pointer-events:none;
+}
+
+#app{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column}
+
+/* ── Header ── */
+header{
+  display:flex;align-items:center;gap:16px;
+  padding:14px 28px;
+  background:rgba(3,8,15,.9);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(12px);
+  position:sticky;top:0;z-index:100;
+}
+.logo-mark{
+  width:36px;height:36px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--g),#0ea5e9);
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-size:18px;box-shadow:0 0 20px rgba(0,210,160,.3);
+}
+.brand h1{font-size:.95rem;font-weight:700;letter-spacing:.5px;color:var(--g)}
+.brand p{font-size:.68rem;color:var(--muted);margin-top:1px}
+.spacer{flex:1}
+.pill{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:4px 12px;border-radius:20px;font-size:.72rem;font-weight:600;
+  border:1px solid;
+}
+.pill-live{color:var(--g);border-color:rgba(0,210,160,.3);background:rgba(0,210,160,.07)}
+.pill-live .dot{
+  width:7px;height:7px;border-radius:50%;background:var(--g);
+  animation:pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,210,160,.6)}50%{box-shadow:0 0 0 5px rgba(0,210,160,0)}}
+.pill-device{color:var(--muted);border-color:rgba(100,116,139,.2);background:rgba(100,116,139,.06)}
+.clear-btn{
+  background:transparent;border:1px solid rgba(248,113,113,.25);
+  color:var(--red);padding:5px 14px;border-radius:6px;cursor:pointer;
+  font-size:.72rem;font-weight:600;transition:all .2s;letter-spacing:.3px;
+}
+.clear-btn:hover{background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.5)}
+
+/* ── Main layout ── */
+main{flex:1;padding:24px 28px;display:flex;flex-direction:column;gap:20px}
+
+/* ── Stat cards ── */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.stat-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:18px 20px;
+  position:relative;overflow:hidden;transition:border-color .25s,transform .2s;
+}
+.stat-card:hover{border-color:var(--border-hi);transform:translateY(-2px)}
+.stat-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--card-accent,var(--g));opacity:.7;
+}
+.stat-card .icon{font-size:1.4rem;margin-bottom:10px}
+.stat-card .val{
+  font-size:2.2rem;font-weight:800;line-height:1;
+  color:var(--card-accent,var(--g));
+  font-variant-numeric:tabular-nums;
+}
+.stat-card .label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:6px}
+.stat-card .sub{font-size:.68rem;color:var(--muted);margin-top:3px;opacity:.7}
+.c-total {--card-accent:var(--g)}
+.c-ips   {--card-accent:var(--blue)}
+.c-rtsp  {--card-accent:#a78bfa}
+.c-http  {--card-accent:var(--amber)}
+.c-telnet{--card-accent:var(--red)}
+
+/* ── Mid row ── */
+.mid-row{display:grid;grid-template-columns:280px 1fr;gap:14px}
+@media(max-width:800px){.mid-row{grid-template-columns:1fr}}
+
+.chart-card,.timeline-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;
+  display:flex;flex-direction:column;gap:16px;
+}
+.card-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+
+/* Donut */
+.donut-wrap{position:relative;width:140px;height:140px;margin:0 auto}
+.donut-wrap svg{transform:rotate(-90deg)}
+.donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.donut-center .dc-val{font-size:1.8rem;font-weight:800;color:var(--text)}
+.donut-center .dc-lbl{font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.legend{display:flex;flex-direction:column;gap:8px}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:.75rem}
+.legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.legend-item .lname{flex:1;color:var(--text)}
+.legend-item .lval{color:var(--muted);font-variant-numeric:tabular-nums;min-width:20px;text-align:right}
+.lbar{height:3px;border-radius:2px;flex:1;max-width:60px;background:rgba(255,255,255,.07)}
+.lbar-fill{height:100%;border-radius:2px;transition:width .6s ease}
+
+/* Feed */
+.feed{display:flex;flex-direction:column;overflow-y:auto;max-height:220px;flex:1}
+.feed::-webkit-scrollbar{width:3px}
+.feed::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:2px}
+.feed-item{
+  display:flex;align-items:center;gap:10px;padding:8px 4px;
+  border-bottom:1px solid rgba(255,255,255,.04);
+  animation:fadeSlide .35s ease;
+}
+@keyframes fadeSlide{from{opacity:0;transform:translateY(-6px)}}
+.feed-item:last-child{border-bottom:none}
+.feed-icon{font-size:1rem;flex-shrink:0;width:24px;text-align:center}
+.feed-info{flex:1;min-width:0}
+.fi-ip{font-size:.78rem;color:var(--blue);font-family:monospace}
+.fi-cred{font-size:.7rem;color:var(--purple);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.feed-time{font-size:.65rem;color:var(--muted);white-space:nowrap}
+.feed-badge{font-size:.62rem;font-weight:700;padding:2px 7px;border-radius:10px;flex-shrink:0}
+.fb-rtsp  {background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.25)}
+.fb-http  {background:rgba(251,191,36,.1); color:var(--amber);border:1px solid rgba(251,191,36,.2)}
+.fb-telnet{background:rgba(248,113,113,.1);color:var(--red); border:1px solid rgba(248,113,113,.2)}
+.feed-empty{color:var(--muted);font-size:.8rem;text-align:center;padding:24px 0}
+
+/* ── Table ── */
+.table-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.table-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{
+  background:rgba(0,0,0,.25);color:var(--muted);text-align:left;
+  padding:9px 16px;font-size:.68rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.6px;
+  border-bottom:1px solid rgba(255,255,255,.05);white-space:nowrap;
+}
+td{padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.03);font-size:.78rem;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(0,210,160,.03)}
+.td-ts {color:var(--muted);font-size:.7rem;white-space:nowrap;font-family:monospace}
+.td-ip {color:var(--blue);font-family:monospace}
+.td-cred{color:var(--purple);font-family:monospace;font-size:.75rem}
+.td-payload{color:var(--muted);font-size:.7rem;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty-row td{text-align:center;color:var(--muted);padding:40px;font-size:.82rem}
+
+/* ── Footer ── */
+footer{
+  padding:12px 28px;border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:.66rem;color:var(--muted);
+}
+.uptime{color:rgba(0,210,160,.6)}
 </style>
 </head>
 <body>
+<div id="app">
+
 <header>
-  <span class="logo">&#128737;</span>
-  <h1>ShadowSentry S3</h1>
-  <span class="chip">ESP32-S3 HoneyPot</span>
-  <span class="chip live" id="status">&#9679; ACTIVE</span>
-</header>
-<div class="container">
-  <div class="stats">
-    <div class="card"><h3>Total Attacks</h3><div class="val" id="s-total">—</div><div class="sub">All time</div></div>
-    <div class="card"><h3>Unique IPs</h3><div class="val" id="s-ips">—</div><div class="sub">Distinct attackers</div></div>
-    <div class="card"><h3>RTSP &#128249;</h3><div class="val" id="s-rtsp">—</div><div class="sub">Port 554 · Mirai bots</div></div>
-    <div class="card"><h3>HTTP &#127760;</h3><div class="val" id="s-http">—</div><div class="sub">Port 80 · Fake Hikvision</div></div>
-    <div class="card"><h3>Telnet &#128187;</h3><div class="val" id="s-telnet">—</div><div class="sub">Port 23 · Bruteforce</div></div>
+  <div class="logo-mark">&#128737;</div>
+  <div class="brand">
+    <h1>ShadowSentry S3</h1>
+    <p>Edge Deception Honeypot &nbsp;·&nbsp; ESP32-S3</p>
   </div>
-  <div class="section">
-    <div class="section-hdr">
-      <h2>Attack Log</h2>
-      <div class="hdr-btns">
-        <button class="btn" onclick="load()">&#8635; Refresh</button>
-        <button class="btn btn-danger" onclick="clearLogs()">&#128465; Clear</button>
+  <div class="spacer"></div>
+  <span class="pill pill-device">&#9881; Core&nbsp;0/1 &nbsp;240&nbsp;MHz</span>
+  &nbsp;
+  <span class="pill pill-live" id="status-pill"><span class="dot"></span>ACTIVE</span>
+  &nbsp;&nbsp;
+  <button class="clear-btn" onclick="clearLogs()">&#128465; Clear Logs</button>
+</header>
+
+<main>
+
+  <div class="stats-row">
+    <div class="stat-card c-total">
+      <div class="icon">&#9889;</div>
+      <div class="val" id="s-total">0</div>
+      <div class="label">Total Attacks</div>
+      <div class="sub">All-time counter</div>
+    </div>
+    <div class="stat-card c-ips">
+      <div class="icon">&#127758;</div>
+      <div class="val" id="s-ips">0</div>
+      <div class="label">Unique IPs</div>
+      <div class="sub">Distinct attackers</div>
+    </div>
+    <div class="stat-card c-rtsp">
+      <div class="icon">&#128249;</div>
+      <div class="val" id="s-rtsp">0</div>
+      <div class="label">RTSP Hits</div>
+      <div class="sub">Port 554 · Mirai bots</div>
+    </div>
+    <div class="stat-card c-http">
+      <div class="icon">&#128760;</div>
+      <div class="val" id="s-http">0</div>
+      <div class="label">HTTP Hits</div>
+      <div class="sub">Port 80 · Fake Hikvision</div>
+    </div>
+    <div class="stat-card c-telnet">
+      <div class="icon">&#128187;</div>
+      <div class="val" id="s-telnet">0</div>
+      <div class="label">Telnet Hits</div>
+      <div class="sub">Port 23 · Bruteforce</div>
+    </div>
+  </div>
+
+  <div class="mid-row">
+
+    <div class="chart-card">
+      <div class="card-title">Attack Distribution</div>
+      <div class="donut-wrap">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <circle cx="70" cy="70" r="54" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="16"/>
+          <circle id="arc-rtsp"   cx="70" cy="70" r="54" fill="none" stroke="#a78bfa" stroke-width="16" stroke-dasharray="0 340" stroke-linecap="round"/>
+          <circle id="arc-http"   cx="70" cy="70" r="54" fill="none" stroke="#fbbf24" stroke-width="16" stroke-dasharray="0 340" stroke-linecap="round"/>
+          <circle id="arc-telnet" cx="70" cy="70" r="54" fill="none" stroke="#f87171" stroke-width="16" stroke-dasharray="0 340" stroke-linecap="round"/>
+        </svg>
+        <div class="donut-center">
+          <div class="dc-val" id="dc-total">0</div>
+          <div class="dc-lbl">attacks</div>
+        </div>
+      </div>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#a78bfa"></div>
+          <span class="lname">RTSP</span>
+          <div class="lbar"><div class="lbar-fill" id="lb-rtsp" style="background:#a78bfa;width:0%"></div></div>
+          <span class="lval" id="lv-rtsp">0</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#fbbf24"></div>
+          <span class="lname">HTTP</span>
+          <div class="lbar"><div class="lbar-fill" id="lb-http" style="background:#fbbf24;width:0%"></div></div>
+          <span class="lval" id="lv-http">0</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#f87171"></div>
+          <span class="lname">Telnet</span>
+          <div class="lbar"><div class="lbar-fill" id="lb-telnet" style="background:#f87171;width:0%"></div></div>
+          <span class="lval" id="lv-telnet">0</span>
+        </div>
       </div>
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Timestamp</th>
-          <th>Source IP</th>
-          <th>Protocol</th>
-          <th>Credentials</th>
-          <th>Payload</th>
-        </tr>
-      </thead>
-      <tbody id="tbody">
-        <tr><td colspan="5" class="empty">Loading…</td></tr>
-      </tbody>
-    </table>
+
+    <div class="timeline-card">
+      <div class="card-title">&#9889; Live Attack Feed</div>
+      <div class="feed" id="feed">
+        <div class="feed-empty">Waiting for attackers…</div>
+      </div>
+    </div>
+
   </div>
+
+  <div class="table-card">
+    <div class="table-hdr">
+      <div class="card-title">Attack Log</div>
+      <span style="font-size:.7rem;color:var(--muted)" id="tbl-count"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Source IP</th>
+            <th>Protocol</th>
+            <th>Username</th>
+            <th>Password</th>
+            <th>Payload</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr class="empty-row"><td colspan="6">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <span>ShadowSentry S3 &nbsp;·&nbsp; ESP32-S3 &nbsp;·&nbsp; MIT License</span>
+  <span class="uptime" id="uptime"></span>
+  <span>Auto-refresh every 10s</span>
+</footer>
+
 </div>
+
 <script>
 function ip4(n){return[(n>>>0)&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255].join('.')}
-const BADGE=['<span class="badge r">RTSP</span>','<span class="badge h">HTTP</span>','<span class="badge t">TELNET</span>'];
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fmt(ts){
+  if(!ts)return'—';
+  const d=new Date(ts*1000),p=n=>String(n).padStart(2,'0');
+  return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+const BADGE=['<span class="feed-badge fb-rtsp">RTSP</span>','<span class="feed-badge fb-http">HTTP</span>','<span class="feed-badge fb-telnet">TELNET</span>'];
+const ICON=['&#128249;','&#128760;','&#128187;'];
+const CIRC=2*Math.PI*54;
 
+// animated counter
+const _prev={};
+function setVal(id,val){
+  const el=document.getElementById(id);if(!el)return;
+  const prev=_prev[id]||0;if(prev===val)return;_prev[id]=val;
+  let start=null;
+  (function step(ts){
+    if(!start)start=ts;
+    const p=Math.min((ts-start)/600,1),e=1-Math.pow(1-p,3);
+    el.textContent=Math.round(prev+(val-prev)*e);
+    p<1?requestAnimationFrame(step):el.textContent=val;
+  })(performance.now());
+}
+
+// donut chart
+function updateDonut(r,h,t){
+  const tot=r+h+t||1,gap=4;
+  function seg(id,v,off){
+    const len=Math.max(v/tot*(CIRC-gap*3),v>0?6:0);
+    const el=document.getElementById(id);
+    el.style.transition='stroke-dasharray .7s cubic-bezier(.4,0,.2,1),stroke-dashoffset .7s cubic-bezier(.4,0,.2,1)';
+    el.setAttribute('stroke-dasharray',`${len} ${CIRC}`);
+    el.setAttribute('stroke-dashoffset',-off);
+    return len;
+  }
+  const l1=seg('arc-rtsp',r,0),l2=seg('arc-http',h,l1+gap);
+  seg('arc-telnet',t,l1+l2+gap*2);
+  setVal('dc-total',r+h+t);
+  const s=r+h+t||1;
+  ['rtsp','http','telnet'].forEach((k,i)=>{
+    const v=[r,h,t][i];
+    document.getElementById('lb-'+k).style.width=Math.round(v/s*100)+'%';
+    document.getElementById('lv-'+k).textContent=v;
+  });
+}
+
+// live feed
+const _seen=new Set();
+function updateFeed(entries){
+  if(!entries||!entries.length)return;
+  const feed=document.getElementById('feed');
+  const empty=feed.querySelector('.feed-empty');
+  if(empty)feed.innerHTML='';
+  entries.slice(0,15).forEach(e=>{
+    const key=`${e.ts}-${e.ip}-${e.type}`;
+    if(_seen.has(key))return;_seen.add(key);
+    const cred=e.user?`${esc(e.user)}:${esc(e.pass)}`:'—';
+    const div=document.createElement('div');
+    div.className='feed-item';
+    div.innerHTML=`<span class="feed-icon">${ICON[e.type]||'?'}</span>`+
+      `<div class="feed-info"><div class="fi-ip">${ip4(e.ip)}</div><div class="fi-cred">${cred}</div></div>`+
+      `${BADGE[e.type]||''}<span class="feed-time">${fmt(e.ts).split(' ')[1]||''}</span>`;
+    feed.insertBefore(div,feed.firstChild);
+  });
+  while(feed.children.length>40)feed.removeChild(feed.lastChild);
+}
+
+// table
+function updateTable(entries){
+  const tb=document.getElementById('tbody');
+  document.getElementById('tbl-count').textContent=entries.length?`Showing ${entries.length} most recent`:'';
+  if(!entries.length){tb.innerHTML='<tr class="empty-row"><td colspan="6">&#10003; No attacks recorded yet</td></tr>';return;}
+  tb.innerHTML=entries.map(e=>`<tr>
+    <td class="td-ts">${fmt(e.ts)}</td>
+    <td class="td-ip">${ip4(e.ip)}</td>
+    <td>${BADGE[e.type]||e.type}</td>
+    <td class="td-cred">${e.user?esc(e.user):'—'}</td>
+    <td class="td-cred">${e.pass?esc(e.pass):'—'}</td>
+    <td class="td-payload" title="${esc(e.payload||'')}">${esc(e.payload||'')}</td>
+  </tr>`).join('');
+}
+
+// online indicator
+function setOnline(ok){
+  const p=document.getElementById('status-pill');
+  if(ok){p.className='pill pill-live';p.innerHTML='<span class="dot"></span>ACTIVE';}
+  else{p.className='pill';p.style.cssText='color:var(--red);border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.07)';p.innerHTML='&#9888; OFFLINE';}
+}
+
+// session uptime clock
+const _t0=Date.now();
+setInterval(()=>{
+  const s=Math.floor((Date.now()-_t0)/1000),p=n=>String(n).padStart(2,'0');
+  document.getElementById('uptime').textContent=`Session ${p(Math.floor(s/3600))}:${p(Math.floor(s%3600/60))}:${p(s%60)}`;
+},1000);
+
+// fetch & render
 async function load(){
   try{
-    const r=await fetch('/api/attacks');
-    if(!r.ok)throw new Error(r.status);
-    const d=await r.json();
-    document.getElementById('s-total').textContent=d.total;
-    document.getElementById('s-ips').textContent=d.unique_ips;
-    document.getElementById('s-rtsp').textContent=d.by_type[0]??0;
-    document.getElementById('s-http').textContent=d.by_type[1]??0;
-    document.getElementById('s-telnet').textContent=d.by_type[2]??0;
-    const tb=document.getElementById('tbody');
-    if(!d.entries||!d.entries.length){
-      tb.innerHTML='<tr><td colspan="5" class="empty">No attacks recorded yet — your network is clean &#10003;</td></tr>';
-      return;
-    }
-    tb.innerHTML=d.entries.map(e=>`
-      <tr>
-        <td class="ts">${new Date(e.ts*1000).toLocaleString()}</td>
-        <td class="ip">${ip4(e.ip)}</td>
-        <td>${BADGE[e.type]||'?'}</td>
-        <td class="cred">${e.user?`${e.user}:${e.pass}`:'—'}</td>
-        <td style="color:#8b949e;font-size:.72rem;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.payload||''}</td>
-      </tr>`).join('');
-  }catch(e){
-    document.getElementById('tbody').innerHTML='<tr><td colspan="5" class="empty" style="color:#f85149">&#9888; Failed to load — check connection</td></tr>';
-    document.getElementById('status').textContent='⬤ OFFLINE';
-    document.getElementById('status').style.color='#f85149';
+    const r=await fetch('/api/attacks');if(!r.ok)throw 0;
+    const d=await r.json(),bt=d.by_type||[0,0,0],en=d.entries||[];
+    setVal('s-total',d.total||0);
+    setVal('s-ips',new Set(en.map(e=>e.ip)).size);
+    setVal('s-rtsp',bt[0]||0);setVal('s-http',bt[1]||0);setVal('s-telnet',bt[2]||0);
+    updateDonut(bt[0]||0,bt[1]||0,bt[2]||0);
+    updateFeed(en);updateTable(en);setOnline(true);
+  }catch{
+    setOnline(false);
+    document.getElementById('tbody').innerHTML='<tr class="empty-row"><td colspan="6" style="color:var(--red)">&#9888; Device unreachable</td></tr>';
   }
 }
-
 async function clearLogs(){
-  if(!confirm('Clear all attack logs from flash?'))return;
-  await fetch('/api/clear',{method:'POST'});
-  load();
+  if(!confirm('Wipe all attack logs from flash memory?'))return;
+  try{await fetch('/api/clear',{method:'POST'});_seen.clear();document.getElementById('feed').innerHTML='<div class="feed-empty">Waiting for attackers…</div>';load();}
+  catch{alert('Clear failed');}
 }
-
-load();
-setInterval(load,10000);
+load();setInterval(load,10000);
 </script>
 </body>
 </html>
