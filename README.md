@@ -2,6 +2,8 @@
 
 > Zero-Configuration, Serverless Hardware Honeypot on a Single ESP32-S3
 
+![ShadowSentry S3 Dashboard](docs/dashboard.png)
+
 ShadowSentry S3 — автономний апаратний honeypot класу **Edge Deception**. Перетворює одну плату ESP32-S3 (~$5) на невидиму пастку для ботнетів, сканерів та малварі всередині локальної мережі. Не потребує Raspberry Pi, хмарних серверів чи зовнішніх баз даних — усі обчислення та логи зберігаються на одному чипі.
 
 ---
