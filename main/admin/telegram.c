@@ -13,6 +13,7 @@
 static const char *TAG = "TELEGRAM";
 
 static QueueHandle_t s_queue;
+static char s_boot_ip[INET_ADDRSTRLEN];
 
 // ── UTF-8 emoji constants ─────────────────────────────────────────────────────
 // Stored as byte sequences to avoid editor encoding issues.
@@ -149,6 +150,11 @@ void telegram_notify(const attack_log_t *entry)
         ESP_LOGD(TAG, "Queue full — notification dropped");
 }
 
+void telegram_set_boot_ip(const char *ip_str)
+{
+    strlcpy(s_boot_ip, ip_str, sizeof(s_boot_ip));
+}
+
 // ── Task entry point ──────────────────────────────────────────────────────────
 
 void telegram_task(void *arg)
@@ -158,6 +164,23 @@ void telegram_task(void *arg)
 
     ESP_LOGI(TAG, "Ready (queue=%d, timeout=%dms, rate_limit=%dms)",
              TELEGRAM_QUEUE_DEPTH, TELEGRAM_HTTP_TIMEOUT_MS, TELEGRAM_RATE_LIMIT_MS);
+
+    // Send boot-online notification if Telegram is configured and IP is known
+    if (TELEGRAM_BOT_TOKEN[0] != 'Y' && s_boot_ip[0] != '\0') {
+        char msg[256];
+        snprintf(msg, sizeof(msg),
+            "\xF0\x9F\x9F\xA2"  // 🟢
+            " <b>ShadowSentry S3 Online</b>\n\n"
+            "\xF0\x9F\x8C\x90"  // 🌐
+            " IP: <code>%s</code>\n"
+            "\xF0\x9F\x9B\xA1"  // 🛡
+            " Honeypots: RTSP / HTTP / Telnet / SSH / FTP\n"
+            "\xF0\x9F\x94\x91"  // 🔑
+            " Admin: <code>http://%s:%d</code>",
+            s_boot_ip, s_boot_ip, ADMIN_PORT);
+        send_message(msg);
+        ESP_LOGI(TAG, "Boot notification sent");
+    }
 
     attack_log_t entry;
     while (1) {
