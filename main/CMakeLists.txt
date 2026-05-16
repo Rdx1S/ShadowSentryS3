@@ -27,6 +27,7 @@ idf_component_register(
         "honeypot/http_trap.c"
         "honeypot/telnet_trap.c"
         "honeypot/ssh_trap.c"
+        "honeypot/ftp_trap.c"
         "admin/admin_panel.c"
         "admin/telegram.c"
         "storage/log_store.c"

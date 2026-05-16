@@ -22,12 +22,13 @@ static QueueHandle_t s_queue;
 #define EMOJI_HTTP   "\xF0\x9F\x8C\x90"   // 🌐
 #define EMOJI_TELNET "\xF0\x9F\x92\xBB"   // 💻
 #define EMOJI_SSH    "\xF0\x9F\x94\x91"   // 🔑
+#define EMOJI_FTP    "\xF0\x9F\x93\x81"   // 📁
 #define EMOJI_IP     "\xF0\x9F\x8C\x8D"   // 🌍
 #define EMOJI_CREDS  "\xF0\x9F\x91\xA4"   // 👤
 #define EMOJI_LOG    "\xF0\x9F\x93\x8B"   // 📋
 
-static const char *s_type_label[] = {"RTSP", "HTTP", "Telnet", "SSH"};
-static const char *s_type_emoji[] = {EMOJI_RTSP, EMOJI_HTTP, EMOJI_TELNET, EMOJI_SSH};
+static const char *s_type_label[] = {"RTSP", "HTTP", "Telnet", "SSH", "FTP"};
+static const char *s_type_emoji[] = {EMOJI_RTSP, EMOJI_HTTP, EMOJI_TELNET, EMOJI_SSH, EMOJI_FTP};
 
 // ── String escaping helpers ───────────────────────────────────────────────────
 

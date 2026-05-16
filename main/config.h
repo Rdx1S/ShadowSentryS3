@@ -66,6 +66,7 @@
 #define HTTP_PORT                   80      // Web scanner / NVR login harvest
 #define TELNET_PORT                 23      // Telnet bruteforce (default creds)
 #define SSH_PORT                    22      // SSH scanner version fingerprinting
+#define FTP_PORT                    21      // FTP bruteforce (USER/PASS plaintext)
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 //
@@ -108,3 +109,8 @@ _Static_assert(ADMIN_PORT  != SSH_PORT,    "ADMIN_PORT collides with SSH_PORT");
 _Static_assert(SSH_PORT    != RTSP_PORT,   "SSH_PORT and RTSP_PORT must differ");
 _Static_assert(SSH_PORT    != HTTP_PORT,   "SSH_PORT and HTTP_PORT must differ");
 _Static_assert(SSH_PORT    != TELNET_PORT, "SSH_PORT and TELNET_PORT must differ");
+_Static_assert(FTP_PORT    != RTSP_PORT,   "FTP_PORT and RTSP_PORT must differ");
+_Static_assert(FTP_PORT    != HTTP_PORT,   "FTP_PORT and HTTP_PORT must differ");
+_Static_assert(FTP_PORT    != TELNET_PORT, "FTP_PORT and TELNET_PORT must differ");
+_Static_assert(FTP_PORT    != SSH_PORT,    "FTP_PORT and SSH_PORT must differ");
+_Static_assert(ADMIN_PORT  != FTP_PORT,    "ADMIN_PORT collides with FTP_PORT");

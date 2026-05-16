@@ -18,7 +18,7 @@
  *   {
  *     "total":      <uint32 all-time attack count>,
  *     "unique_ips": <int unique IPs in current window>,
- *     "by_type":    [<rtsp>, <http>, <telnet>, <ssh>],
+ *     "by_type":    [<rtsp>, <http>, <telnet>, <ssh>, <ftp>],
  *     "entries": [
  *       { "ts": <unix>, "ip": <uint32 network-order>,
  *         "type": 0|1|2, "user": "...", "pass": "...", "payload": "..." },
