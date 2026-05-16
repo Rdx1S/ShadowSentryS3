@@ -7,6 +7,7 @@ typedef enum {
     ATTACK_RTSP   = 0,
     ATTACK_HTTP   = 1,
     ATTACK_TELNET = 2,
+    ATTACK_SSH    = 3,
 } attack_type_t;
 
 typedef struct {
