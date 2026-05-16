@@ -65,6 +65,7 @@
 #define RTSP_PORT                   554     // Mirai / Mozi RTSP bruteforce
 #define HTTP_PORT                   80      // Web scanner / NVR login harvest
 #define TELNET_PORT                 23      // Telnet bruteforce (default creds)
+#define SSH_PORT                    22      // SSH scanner version fingerprinting
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 //
@@ -103,3 +104,7 @@ _Static_assert(HTTP_PORT   != TELNET_PORT, "HTTP_PORT and TELNET_PORT must diffe
 _Static_assert(ADMIN_PORT  != RTSP_PORT,   "ADMIN_PORT collides with RTSP_PORT");
 _Static_assert(ADMIN_PORT  != HTTP_PORT,   "ADMIN_PORT collides with HTTP_PORT");
 _Static_assert(ADMIN_PORT  != TELNET_PORT, "ADMIN_PORT collides with TELNET_PORT");
+_Static_assert(ADMIN_PORT  != SSH_PORT,    "ADMIN_PORT collides with SSH_PORT");
+_Static_assert(SSH_PORT    != RTSP_PORT,   "SSH_PORT and RTSP_PORT must differ");
+_Static_assert(SSH_PORT    != HTTP_PORT,   "SSH_PORT and HTTP_PORT must differ");
+_Static_assert(SSH_PORT    != TELNET_PORT, "SSH_PORT and TELNET_PORT must differ");

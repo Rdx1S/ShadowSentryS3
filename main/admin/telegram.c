@@ -21,12 +21,13 @@ static QueueHandle_t s_queue;
 #define EMOJI_RTSP   "\xF0\x9F\x93\xB9"   // 📹
 #define EMOJI_HTTP   "\xF0\x9F\x8C\x90"   // 🌐
 #define EMOJI_TELNET "\xF0\x9F\x92\xBB"   // 💻
+#define EMOJI_SSH    "\xF0\x9F\x94\x91"   // 🔑
 #define EMOJI_IP     "\xF0\x9F\x8C\x8D"   // 🌍
 #define EMOJI_CREDS  "\xF0\x9F\x91\xA4"   // 👤
 #define EMOJI_LOG    "\xF0\x9F\x93\x8B"   // 📋
 
-static const char *s_type_label[] = {"RTSP", "HTTP", "Telnet"};
-static const char *s_type_emoji[] = {EMOJI_RTSP, EMOJI_HTTP, EMOJI_TELNET};
+static const char *s_type_label[] = {"RTSP", "HTTP", "Telnet", "SSH"};
+static const char *s_type_emoji[] = {EMOJI_RTSP, EMOJI_HTTP, EMOJI_TELNET, EMOJI_SSH};
 
 // ── String escaping helpers ───────────────────────────────────────────────────
 
@@ -179,17 +180,28 @@ void telegram_task(void *arg)
         strlcpy(ip_str, inet_ntoa(ip_addr), sizeof(ip_str));
 
         char msg[768];
-        snprintf(msg, sizeof(msg),
-            EMOJI_ALERT " <b>ShadowSentry S3 Alert</b>\n\n"
-            "%s Attack: <b>%s</b>\n"
-            EMOJI_IP    " IP: <code>%s</code>\n"
-            EMOJI_CREDS " Creds: <code>%s:%s</code>\n"
-            EMOJI_LOG   " <code>%.200s</code>",
-            s_type_emoji[entry.type],
-            s_type_label[entry.type],
-            ip_str,
-            user_h, pass_h,
-            pay_h);
+        if (entry.type == ATTACK_SSH) {
+            // SSH: no credentials (auth is encrypted); show client fingerprint only
+            snprintf(msg, sizeof(msg),
+                EMOJI_ALERT " <b>ShadowSentry S3 Alert</b>\n\n"
+                EMOJI_SSH   " Attack: <b>SSH</b>\n"
+                EMOJI_IP    " IP: <code>%s</code>\n"
+                EMOJI_LOG   " <code>%.200s</code>",
+                ip_str,
+                pay_h);
+        } else {
+            snprintf(msg, sizeof(msg),
+                EMOJI_ALERT " <b>ShadowSentry S3 Alert</b>\n\n"
+                "%s Attack: <b>%s</b>\n"
+                EMOJI_IP    " IP: <code>%s</code>\n"
+                EMOJI_CREDS " Creds: <code>%s:%s</code>\n"
+                EMOJI_LOG   " <code>%.200s</code>",
+                s_type_emoji[entry.type],
+                s_type_label[entry.type],
+                ip_str,
+                user_h, pass_h,
+                pay_h);
+        }
 
         ESP_LOGD(TAG, "Sending alert for %s (%s)", ip_str,
                  s_type_label[entry.type]);

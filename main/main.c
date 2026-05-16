@@ -9,6 +9,7 @@
 #include "rtsp_trap.h"
 #include "http_trap.h"
 #include "telnet_trap.h"
+#include "ssh_trap.h"
 #include "admin_panel.h"
 #include "telegram.h"
 #include "config.h"
@@ -29,6 +30,9 @@ static const char *TAG = "MAIN";
 //  telnet : user[32] + pass[64] + attack_log_t(240) + overhead (~1200)
 //           → 4096 gives ~2.5 KB headroom
 //
+//  ssh    : line[256] + attack_log_t(240) + overhead (~1200)
+//           → 3072 gives ~1.4 KB headroom
+//
 //  tg     : user_h[96] + pass_h[192] + pay_h[384] + msg[768]
 //           + body[1280] + json_text[1024] + url[128]
 //           + esp_http_client internal frame (~1.5 KB) + overhead (~1 KB)
@@ -41,6 +45,7 @@ static const char *TAG = "MAIN";
 #define STACK_RTSP      6144
 #define STACK_HTTP      5120
 #define STACK_TELNET    4096
+#define STACK_SSH       3072
 #define STACK_TELEGRAM  8192
 #define STACK_ADMIN     8192
 
@@ -116,6 +121,7 @@ void app_main(void)
     ESP_LOGI(TAG, "  │  RTSP    port %-5d  (Fake Hikvision camera)",  RTSP_PORT);
     ESP_LOGI(TAG, "  │  HTTP    port %-5d  (Fake NVR login page)",    HTTP_PORT);
     ESP_LOGI(TAG, "  │  Telnet  port %-5d  (Fake Ubuntu 20.04)",      TELNET_PORT);
+    ESP_LOGI(TAG, "  │  SSH     port %-5d  (Fake OpenSSH 8.9p1)",     SSH_PORT);
     ESP_LOGI(TAG, "  ├─ Core 1  Admin World ───────────────────");
     ESP_LOGI(TAG, "  │  Panel   http://%s:%d", ip, ADMIN_PORT);
     ESP_LOGI(TAG, "  │  Telegram alerts: %s",
@@ -129,6 +135,7 @@ void app_main(void)
     SPAWN(rtsp_trap_task,   "rtsp",   STACK_RTSP,     PRIO_HONEYPOT, 0);
     SPAWN(http_trap_task,   "http",   STACK_HTTP,     PRIO_HONEYPOT, 0);
     SPAWN(telnet_trap_task, "telnet", STACK_TELNET,   PRIO_HONEYPOT, 0);
+    SPAWN(ssh_trap_task,    "ssh",    STACK_SSH,      PRIO_HONEYPOT, 0);
 
     // ── Core 1 — Admin World ─────────────────────────────────────────────────
     // Telegram task must start before admin panel so telegram_notify() has
