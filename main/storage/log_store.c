@@ -9,10 +9,6 @@
 
 static const char *TAG = "LOGSTORE";
 
-// Path for the binary ring dump and the all-time counter
-#define LOG_FILE_PATH   "/spiffs/attacks.bin"
-#define CTR_FILE_PATH   "/spiffs/total.bin"
-
 // ── In-RAM ring buffer ────────────────────────────────────────────────────────
 static attack_log_t  s_ring[LOG_RING_SIZE];
 static int           s_head  = 0;   // next write position
@@ -26,7 +22,7 @@ static bool              s_spiffs_ok = false;
 
 static void persist_counter(void)
 {
-    FILE *f = fopen(CTR_FILE_PATH, "wb");
+    FILE *f = fopen(LOG_CTR_PATH, "wb");
     if (!f) return;
     fwrite(&s_total, sizeof(s_total), 1, f);
     fclose(f);
@@ -68,7 +64,7 @@ void log_store_init(void)
     s_spiffs_ok = true;
 
     // Restore all-time counter
-    FILE *fc = fopen(CTR_FILE_PATH, "rb");
+    FILE *fc = fopen(LOG_CTR_PATH, "rb");
     if (fc) {
         fread(&s_total, sizeof(s_total), 1, fc);
         fclose(fc);
