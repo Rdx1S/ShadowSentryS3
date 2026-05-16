@@ -145,8 +145,8 @@ void app_main(void)
     SPAWN(ftp_trap_task,    "ftp",    STACK_FTP,      PRIO_HONEYPOT, 0);
 
     // ── Core 1 — Admin World ─────────────────────────────────────────────────
-    // Telegram task must start before admin panel so telegram_notify() has
-    // a valid queue handle when the first honeypot hit arrives.
+    // Pass IP to telegram before spawning so the task can send the boot alert.
+    telegram_set_boot_ip(ip);
     SPAWN(telegram_task,    "tg",     STACK_TELEGRAM, PRIO_TELEGRAM, 1);
     SPAWN(admin_panel_task, "admin",  STACK_ADMIN,    PRIO_ADMIN,    1);
 
