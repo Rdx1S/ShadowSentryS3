@@ -1,5 +1,6 @@
 .DS_Store
 build/
+main/config.h
 .vscode/
 sdkconfig
 sdkconfig.old
