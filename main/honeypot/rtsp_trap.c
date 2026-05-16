@@ -2,17 +2,20 @@
 #include "log_store.h"
 #include "telegram.h"
 #include "config.h"
+#include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lwip/sockets.h"
 #include "lwip/inet.h"
 #include "esp_log.h"
 #include "mbedtls/base64.h"
+#include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 static const char *TAG = "RTSP";
 
-// Fake RTSP/1.0 camera banner
+// Fake Hikvision camera RTSP responses
 static const char RTSP_OPTIONS_RESP[] =
     "RTSP/1.0 200 OK\r\n"
     "CSeq: %d\r\n"
@@ -26,6 +29,8 @@ static const char RTSP_UNAUTH_RESP[] =
     "WWW-Authenticate: Basic realm=\"RTSP Server\"\r\n"
     "\r\n";
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 static int parse_cseq(const char *req)
 {
     const char *p = strstr(req, "CSeq:");
@@ -33,7 +38,11 @@ static int parse_cseq(const char *req)
     return atoi(p + 6);
 }
 
-static bool parse_basic_auth(const char *req, char *user, size_t ulen, char *pass, size_t plen)
+// Decodes "Authorization: Basic <b64>" into user/pass buffers.
+// Returns true only when both user and password are successfully extracted.
+static bool parse_basic_auth(const char *req,
+                              char *user, size_t ulen,
+                              char *pass, size_t plen)
 {
     const char *p = strstr(req, "Authorization: Basic ");
     if (!p) return false;
@@ -46,7 +55,8 @@ static bool parse_basic_auth(const char *req, char *user, size_t ulen, char *pas
 
     unsigned char decoded[128] = {0};
     size_t olen = 0;
-    if (mbedtls_base64_decode(decoded, sizeof(decoded), &olen, (unsigned char *)b64, i) != 0)
+    if (mbedtls_base64_decode(decoded, sizeof(decoded), &olen,
+                              (const unsigned char *)b64, i) != 0)
         return false;
 
     char *colon = memchr(decoded, ':', olen);
@@ -65,12 +75,14 @@ static bool parse_basic_auth(const char *req, char *user, size_t ulen, char *pas
     return true;
 }
 
+// ── Per-connection handler ────────────────────────────────────────────────────
+
 static void handle_client(int sock, struct sockaddr_in *addr)
 {
     char buf[512];
     char resp[256];
 
-    struct timeval tv = {.tv_sec = 10, .tv_usec = 0};
+    struct timeval tv = {.tv_sec = RTSP_RECV_TIMEOUT_S, .tv_usec = 0};
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
     while (1) {
@@ -86,8 +98,10 @@ static void handle_client(int sock, struct sockaddr_in *addr)
 
         } else if (strncmp(buf, "DESCRIBE", 8) == 0) {
             char user[32] = {0}, pass[64] = {0};
+
             if (parse_basic_auth(buf, user, sizeof(user), pass, sizeof(pass))) {
-                ESP_LOGW(TAG, "[%s] creds: %s:%s", inet_ntoa(addr->sin_addr), user, pass);
+                ESP_LOGW(TAG, "[%s] creds captured: %s:%s",
+                         inet_ntoa(addr->sin_addr), user, pass);
 
                 attack_log_t entry = {
                     .type      = ATTACK_RTSP,
@@ -96,18 +110,25 @@ static void handle_client(int sock, struct sockaddr_in *addr)
                 };
                 strlcpy(entry.username, user, sizeof(entry.username));
                 strlcpy(entry.password, pass, sizeof(entry.password));
-                snprintf(entry.payload, sizeof(entry.payload), "RTSP DESCRIBE creds=%s:%s", user, pass);
+                snprintf(entry.payload, sizeof(entry.payload),
+                         "RTSP DESCRIBE creds=%s:%s", user, pass);
+
                 log_store_append(&entry);
                 telegram_notify(&entry);
             }
+
+            // Always reply 401 — never grant access
             snprintf(resp, sizeof(resp), RTSP_UNAUTH_RESP, cseq);
             send(sock, resp, strlen(resp), 0);
 
         } else {
+            // Unknown method — drop the connection
             break;
         }
     }
 }
+
+// ── Task entry point ──────────────────────────────────────────────────────────
 
 void rtsp_trap_task(void *arg)
 {
@@ -123,9 +144,10 @@ void rtsp_trap_task(void *arg)
         .sin_addr.s_addr = INADDR_ANY,
     };
     configASSERT(bind(srv, (struct sockaddr *)&addr, sizeof(addr)) == 0);
-    configASSERT(listen(srv, 4) == 0);
+    configASSERT(listen(srv, RTSP_BACKLOG) == 0);
 
-    ESP_LOGI(TAG, "Honeypot listening on port %d", RTSP_PORT);
+    ESP_LOGI(TAG, "Honeypot listening on port %d (backlog=%d, timeout=%ds)",
+             RTSP_PORT, RTSP_BACKLOG, RTSP_RECV_TIMEOUT_S);
 
     while (1) {
         struct sockaddr_in client;
@@ -133,7 +155,7 @@ void rtsp_trap_task(void *arg)
         int csock = accept(srv, (struct sockaddr *)&client, &clen);
         if (csock < 0) continue;
 
-        ESP_LOGI(TAG, "Connect from %s", inet_ntoa(client.sin_addr));
+        ESP_LOGI(TAG, "Connection from %s", inet_ntoa(client.sin_addr));
         handle_client(csock, &client);
         close(csock);
     }
