@@ -117,6 +117,8 @@ void wifi_manager_init(void)
     esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
     configASSERT(sta_netif);
 
+    esp_netif_set_hostname(sta_netif, DEVICE_HOSTNAME);
+
     wifi_init_config_t init_cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&init_cfg));
 
