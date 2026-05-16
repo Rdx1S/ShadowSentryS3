@@ -17,8 +17,9 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 # ── ESP-IDF version check ─────────────────────────────────────────────────────
 # esp_netif_sntp_init() and WPA3 SAE PWE support require ESP-IDF v5.2 or later.
-# IDF_VERSION is set by project.cmake above.
-if(IDF_VERSION VERSION_LESS "5.2.0")
+# IDF_VERSION is set by project.cmake; may be empty on non-git installations
+# (e.g. PlatformIO package manager) — skip the check in that case.
+if(IDF_VERSION AND IDF_VERSION VERSION_LESS "5.2.0")
     message(FATAL_ERROR
         "\n"
         "  ShadowSentry S3 requires ESP-IDF v5.2.0 or later.\n"
