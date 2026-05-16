@@ -32,7 +32,9 @@ void app_main(void)
     wifi_manager_init();
     wifi_manager_wait_for_ip();
 
-    ESP_LOGI(TAG, "Network up — starting honeypots");
+    char ip[WIFI_IP_STR_LEN];
+    wifi_manager_get_ip_str(ip, sizeof(ip));
+    ESP_LOGI(TAG, "Network up — IP %s — starting honeypots", ip);
 
     // ── Core 0: Hacker World ─────────────────────────────────────────────────
     xTaskCreatePinnedToCore(rtsp_trap_task,   "rtsp",   4096, NULL, 5, NULL, 0);
