@@ -43,10 +43,10 @@ static int read_line(int sock, char *out, size_t outlen)
             // Consume trailing \n after \r
             if (c == '\r') {
                 char peek;
-                struct timeval tv = {.tv_sec = 0, .tv_usec = 50000};
+                struct timeval tv = {.tv_sec = 0, .tv_usec = TELNET_CR_DRAIN_MS * 1000};
                 setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
                 recv(sock, &peek, 1, 0);
-                tv.tv_sec = 30; tv.tv_usec = 0;
+                tv.tv_sec = TELNET_RECV_TIMEOUT_S; tv.tv_usec = 0;
                 setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
             }
             break;
@@ -61,7 +61,7 @@ static int read_line(int sock, char *out, size_t outlen)
 
 static void handle_client(int sock, struct sockaddr_in *addr)
 {
-    struct timeval tv = {.tv_sec = 30, .tv_usec = 0};
+    struct timeval tv = {.tv_sec = TELNET_RECV_TIMEOUT_S, .tv_usec = 0};
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
     send(sock, BANNER, strlen(BANNER), 0);
@@ -69,7 +69,7 @@ static void handle_client(int sock, struct sockaddr_in *addr)
     char user[32], pass[64];
     int attempts = 0;
 
-    while (attempts < 5) {
+    while (attempts < TELNET_MAX_ATTEMPTS) {
         memset(user, 0, sizeof(user));
         memset(pass, 0, sizeof(pass));
 
@@ -112,9 +112,10 @@ void telnet_trap_task(void *arg)
         .sin_addr.s_addr = INADDR_ANY,
     };
     configASSERT(bind(srv, (struct sockaddr *)&addr, sizeof(addr)) == 0);
-    configASSERT(listen(srv, 4) == 0);
+    configASSERT(listen(srv, TELNET_BACKLOG) == 0);
 
-    ESP_LOGI(TAG, "Honeypot listening on port %d", TELNET_PORT);
+    ESP_LOGI(TAG, "Honeypot listening on port %d (backlog=%d, timeout=%ds, max_attempts=%d)",
+             TELNET_PORT, TELNET_BACKLOG, TELNET_RECV_TIMEOUT_S, TELNET_MAX_ATTEMPTS);
 
     while (1) {
         struct sockaddr_in client;

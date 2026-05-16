@@ -84,7 +84,7 @@ static void handle_client(int sock, struct sockaddr_in *addr)
 {
     char buf[1024];
 
-    struct timeval tv = {.tv_sec = 5, .tv_usec = 0};
+    struct timeval tv = {.tv_sec = HTTP_RECV_TIMEOUT_S, .tv_usec = 0};
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
     int len = recv(sock, buf, sizeof(buf) - 1, 0);
@@ -137,9 +137,10 @@ void http_trap_task(void *arg)
         .sin_addr.s_addr = INADDR_ANY,
     };
     configASSERT(bind(srv, (struct sockaddr *)&addr, sizeof(addr)) == 0);
-    configASSERT(listen(srv, 4) == 0);
+    configASSERT(listen(srv, HTTP_BACKLOG) == 0);
 
-    ESP_LOGI(TAG, "Honeypot listening on port %d", HTTP_PORT);
+    ESP_LOGI(TAG, "Honeypot listening on port %d (backlog=%d, timeout=%ds)",
+             HTTP_PORT, HTTP_BACKLOG, HTTP_RECV_TIMEOUT_S);
 
     while (1) {
         struct sockaddr_in client;
