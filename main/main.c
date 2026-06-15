@@ -25,8 +25,9 @@ static const char *TAG = "MAIN";
 //           + mbedTLS base64 frame (~800) + lwIP/FreeRTOS overhead (~1200)
 //           → 6144 gives ~2.9 KB headroom
 //
-//  http   : buf[1024] + key[64] + user[32] + pass[64] + attack_log_t(240)
-//           + overhead (~1200) → 5120 gives ~2.5 KB headroom
+//  http   : buf[1024] + key[64] + user[32] + pass[64] + path[48] + ua[96]
+//           + attack_log_t(240) + overhead (~1200)
+//           → 5120 still gives ~2.3 KB headroom
 //
 //  telnet : user[32] + pass[64] + attack_log_t(240) + overhead (~1200)
 //           → 4096 gives ~2.5 KB headroom
