@@ -173,9 +173,64 @@ tr:last-child td{border-bottom:none}
 tr:hover td{background:rgba(0,210,160,.03)}
 .td-ts {color:var(--muted);font-size:.7rem;white-space:nowrap;font-family:monospace}
 .td-ip {color:var(--blue);font-family:monospace}
+.td-mac{color:var(--muted);font-family:monospace;font-size:.72rem;white-space:nowrap}
+.vendor-chip{
+  display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;
+  font-family:var(--font);font-size:.6rem;font-weight:600;
+  background:rgba(56,189,248,.12);color:var(--blue);border:1px solid rgba(56,189,248,.25);
+}
 .td-cred{color:var(--purple);font-family:monospace;font-size:.75rem}
 .td-payload{color:var(--muted);font-size:.7rem;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .empty-row td{text-align:center;color:var(--muted);padding:40px;font-size:.82rem}
+tbody tr:not(.empty-row){cursor:pointer}
+.feed-item{cursor:pointer}
+
+/* ── Detail modal ── */
+.modal-overlay{
+  position:fixed;inset:0;z-index:200;display:none;
+  align-items:center;justify-content:center;padding:20px;
+  background:rgba(0,0,0,.62);backdrop-filter:blur(4px);animation:ovIn .2s ease;
+}
+.modal-overlay.open{display:flex}
+@keyframes ovIn{from{opacity:0}}
+.modal{
+  width:min(540px,94vw);max-height:88vh;overflow-y:auto;
+  background:var(--surface);border:1px solid var(--border-hi);border-radius:14px;
+  box-shadow:0 24px 60px rgba(0,0,0,.55);animation:popIn .24s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes popIn{from{opacity:0;transform:scale(.94) translateY(12px)}}
+.modal::-webkit-scrollbar{width:4px}
+.modal::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:2px}
+.modal-head{
+  display:flex;align-items:center;gap:13px;padding:20px 22px;
+  border-bottom:1px solid var(--border);position:sticky;top:0;
+  background:var(--surface);border-radius:14px 14px 0 0;
+}
+.m-icon{font-size:1.7rem;flex-shrink:0}
+.m-title{flex:1;min-width:0}
+.m-title h3{font-size:1.02rem;color:var(--text);font-weight:700;letter-spacing:.3px}
+.m-title p{font-size:.7rem;color:var(--muted);margin-top:2px}
+.modal-close{
+  background:transparent;border:none;color:var(--muted);font-size:1.5rem;line-height:1;
+  cursor:pointer;padding:2px 9px;border-radius:7px;transition:all .15s;
+}
+.modal-close:hover{background:rgba(255,255,255,.07);color:var(--text)}
+.modal-body{padding:6px 22px 16px}
+.detail-row{display:flex;gap:14px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.detail-row:last-child{border-bottom:none}
+.detail-row .dk{
+  width:118px;flex-shrink:0;color:var(--muted);font-size:.7rem;
+  text-transform:uppercase;letter-spacing:.5px;padding-top:3px;
+}
+.detail-row .dv{flex:1;color:var(--text);font-size:.85rem;word-break:break-word;font-family:monospace}
+.detail-row .dv .muted{color:var(--muted);font-style:italic}
+.modal-foot{padding:0 22px 20px;display:flex;gap:10px}
+.m-btn{
+  flex:1;padding:9px;border-radius:7px;cursor:pointer;font-size:.74rem;font-weight:600;
+  background:rgba(0,210,160,.08);border:1px solid rgba(0,210,160,.25);color:var(--g);transition:all .18s;
+}
+.m-btn:hover{background:rgba(0,210,160,.16)}
+.m-btn.copied{background:rgba(0,210,160,.25)}
 
 /* ── Footer ── */
 footer{
@@ -323,6 +378,7 @@ footer{
           <tr>
             <th>Timestamp</th>
             <th>Source IP</th>
+            <th>MAC / Vendor</th>
             <th>Protocol</th>
             <th>Username</th>
             <th>Password</th>
@@ -330,7 +386,7 @@ footer{
           </tr>
         </thead>
         <tbody id="tbody">
-          <tr class="empty-row"><td colspan="6">Loading…</td></tr>
+          <tr class="empty-row"><td colspan="7">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -344,11 +400,30 @@ footer{
   <span id="sys-info"></span>
 </footer>
 
+<div class="modal-overlay" id="detail-modal" onclick="if(event.target===this)closeDetail()">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="m-icon" id="d-icon">&#9889;</span>
+      <div class="m-title"><h3 id="d-title">Attack</h3><p id="d-sub"></p></div>
+      <button class="modal-close" onclick="closeDetail()" title="Close (Esc)">&times;</button>
+    </div>
+    <div class="modal-body" id="d-body"></div>
+    <div class="modal-foot">
+      <button class="m-btn" id="d-copy" onclick="copyDetail()">&#128203; Copy details</button>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <script>
 function ip4(n){return[(n>>>0)&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255].join('.')}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function macCell(e){
+  const mac=e.mac&&e.mac!=='unknown'?esc(e.mac):'—';
+  const chip=e.vendor?`<span class="vendor-chip">${esc(e.vendor)}</span>`:'';
+  return mac+chip;
+}
 function fmt(ts){
   if(!ts)return'—';
   const d=new Date(ts*1000),p=n=>String(n).padStart(2,'0');
@@ -357,6 +432,56 @@ function fmt(ts){
 const BADGE=['<span class="feed-badge fb-rtsp">RTSP</span>','<span class="feed-badge fb-http">HTTP</span>','<span class="feed-badge fb-telnet">TELNET</span>','<span class="feed-badge fb-ssh">SSH</span>','<span class="feed-badge fb-ftp">FTP</span>'];
 const ICON=['&#128249;','&#128760;','&#128187;','&#128273;','&#128193;'];
 const CIRC=2*Math.PI*54;
+const TNAME=['RTSP','HTTP','Telnet','SSH','FTP'];
+const TPORT=[554,80,23,22,21];
+const TDESC=['Fake Hikvision camera','Fake NVR login page','Fake Ubuntu 20.04','OpenSSH fingerprint','Fake vsFTPd 3.0.5'];
+
+// ── Detail modal ──
+let _entries=[];
+let _detailText='';
+function showDetailKey(key){
+  const e=_entries.find(x=>`${x.ts}-${x.ip}-${x.type}`===key);
+  if(!e)return;
+  const ip=ip4(e.ip), name=TNAME[e.type]||'?';
+  const mac=e.mac&&e.mac!=='unknown'?e.mac:null;
+  const sameIp=_entries.filter(x=>x.ip===e.ip).length;
+  const sameMac=mac?_entries.filter(x=>x.mac===e.mac).length:0;
+  document.getElementById('d-icon').innerHTML=ICON[e.type]||'?';
+  document.getElementById('d-title').textContent=name+' attack';
+  document.getElementById('d-sub').textContent=`Port ${TPORT[e.type]||'?'} · ${TDESC[e.type]||''}`;
+  const v=s=>s?esc(s):'<span class="muted">—</span>';
+  const rows=[
+    ['Time', esc(fmt(e.ts))],
+    ['Protocol', `${esc(name)} <span class="muted">· port ${TPORT[e.type]||'?'}</span>`],
+    ['Source IP', esc(ip)],
+    ['MAC', mac?esc(mac):'<span class="muted">unknown</span>'],
+    ['Vendor', v(e.vendor)],
+    ['Username', v(e.user)],
+    ['Password', v(e.pass)],
+    ['Payload', v(e.payload)],
+    ['From this IP', `${sameIp} event(s) <span class="muted">in current window</span>`],
+  ];
+  if(mac)rows.push(['From this MAC', `${sameMac} event(s) <span class="muted">in current window</span>`]);
+  document.getElementById('d-body').innerHTML=rows.map(([k,val])=>
+    `<div class="detail-row"><div class="dk">${k}</div><div class="dv">${val}</div></div>`).join('');
+  _detailText=
+    `ShadowSentry S3 — ${name} attack\n`+
+    `Time:     ${fmt(e.ts)}\n`+
+    `Protocol: ${name} (port ${TPORT[e.type]||'?'})\n`+
+    `IP:       ${ip}\n`+
+    `MAC:      ${mac||'unknown'}${e.vendor?' ('+e.vendor+')':''}\n`+
+    `Creds:    ${e.user||'-'} : ${e.pass||'-'}\n`+
+    `Payload:  ${e.payload||'-'}`;
+  const cb=document.getElementById('d-copy');cb.classList.remove('copied');cb.innerHTML='&#128203; Copy details';
+  document.getElementById('detail-modal').classList.add('open');
+}
+function closeDetail(){document.getElementById('detail-modal').classList.remove('open');}
+function copyDetail(){
+  navigator.clipboard?.writeText(_detailText).then(()=>{
+    const cb=document.getElementById('d-copy');cb.classList.add('copied');cb.innerHTML='&#10003; Copied';
+  }).catch(()=>{});
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetail();});
 
 // animated counter
 const _prev={};
@@ -407,8 +532,10 @@ function updateFeed(entries){
     const cred=e.user?`${esc(e.user)}:${esc(e.pass)}`:'—';
     const div=document.createElement('div');
     div.className='feed-item';
+    div.setAttribute('onclick',`showDetailKey('${e.ts}-${e.ip}-${e.type}')`);
+    const vchip=e.vendor?`<span class="vendor-chip">${esc(e.vendor)}</span>`:'';
     div.innerHTML=`<span class="feed-icon">${ICON[e.type]||'?'}</span>`+
-      `<div class="feed-info"><div class="fi-ip">${ip4(e.ip)}</div><div class="fi-cred">${cred}</div></div>`+
+      `<div class="feed-info"><div class="fi-ip">${ip4(e.ip)}${vchip}</div><div class="fi-cred">${cred}</div></div>`+
       `${BADGE[e.type]||''}<span class="feed-time">${fmt(e.ts).split(' ')[1]||''}</span>`;
     feed.insertBefore(div,feed.firstChild);
   });
@@ -419,10 +546,11 @@ function updateFeed(entries){
 function updateTable(entries){
   const tb=document.getElementById('tbody');
   document.getElementById('tbl-count').textContent=entries.length?`Showing ${entries.length} most recent`:'';
-  if(!entries.length){tb.innerHTML='<tr class="empty-row"><td colspan="6">&#10003; No attacks recorded yet</td></tr>';return;}
-  tb.innerHTML=entries.map(e=>`<tr>
+  if(!entries.length){tb.innerHTML='<tr class="empty-row"><td colspan="7">&#10003; No attacks recorded yet</td></tr>';return;}
+  tb.innerHTML=entries.map(e=>`<tr onclick="showDetailKey('${e.ts}-${e.ip}-${e.type}')">
     <td class="td-ts">${fmt(e.ts)}</td>
     <td class="td-ip">${ip4(e.ip)}</td>
+    <td class="td-mac">${macCell(e)}</td>
     <td>${BADGE[e.type]||e.type}</td>
     <td class="td-cred">${e.user?esc(e.user):'—'}</td>
     <td class="td-cred">${e.pass?esc(e.pass):'—'}</td>
@@ -449,6 +577,7 @@ async function load(){
   try{
     const r=await fetch('/api/attacks');if(!r.ok)throw 0;
     const d=await r.json(),bt=d.by_type||[0,0,0],en=d.entries||[];
+    _entries=en;
     setVal('s-total',d.total||0);
     setVal('s-ips',new Set(en.map(e=>e.ip)).size);
     setVal('s-rtsp',bt[0]||0);setVal('s-http',bt[1]||0);setVal('s-telnet',bt[2]||0);setVal('s-ssh',bt[3]||0);setVal('s-ftp',bt[4]||0);
@@ -456,7 +585,7 @@ async function load(){
     updateFeed(en);updateTable(en);setOnline(true);
   }catch{
     setOnline(false);
-    document.getElementById('tbody').innerHTML='<tr class="empty-row"><td colspan="6" style="color:var(--red)">&#9888; Device unreachable</td></tr>';
+    document.getElementById('tbody').innerHTML='<tr class="empty-row"><td colspan="7" style="color:var(--red)">&#9888; Device unreachable</td></tr>';
   }
 }
 async function clearLogs(){
