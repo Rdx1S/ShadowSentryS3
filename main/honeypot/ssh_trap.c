@@ -1,6 +1,7 @@
 #include "ssh_trap.h"
 #include "log_store.h"
 #include "telegram.h"
+#include "wifi_manager.h"
 #include "config.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -46,6 +47,7 @@ static void handle_client(int sock, struct sockaddr_in *addr)
     };
     // username/password left zeroed — SSH v2 encrypts auth after key exchange
     strlcpy(entry.payload, line, sizeof(entry.payload));
+    wifi_manager_lookup_mac(addr->sin_addr.s_addr, entry.src_mac);
     log_store_append(&entry);
     telegram_notify(&entry);
 }

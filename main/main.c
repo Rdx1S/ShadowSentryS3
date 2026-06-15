@@ -130,6 +130,10 @@ void app_main(void)
     ESP_LOGI(TAG, "  │  FTP     port %-5d  (Fake vsFTPd 3.0.5)",      FTP_PORT);
     ESP_LOGI(TAG, "  ├─ Core 1  Admin World ───────────────────");
     ESP_LOGI(TAG, "  │  Panel   http://%s:%d", ip, ADMIN_PORT);
+#if MDNS_ENABLE
+    ESP_LOGI(TAG, "  │          http://%s.local:%d  (stable name)",
+             MDNS_HOSTNAME, ADMIN_PORT);
+#endif
     ESP_LOGI(TAG, "  │  Telegram alerts: %s",
              (TELEGRAM_BOT_TOKEN[0] == 'Y') ? "NOT CONFIGURED" : "enabled");
     ESP_LOGI(TAG, "  └─────────────────────────────────────────");

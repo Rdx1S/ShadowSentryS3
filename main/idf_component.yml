@@ -1,0 +1,10 @@
+## Managed component dependencies (fetched by the IDF Component Manager at build).
+##
+## espressif/mdns provides multicast-DNS (.local) name resolution so the device
+## is reachable at  http://<MDNS_HOSTNAME>.local:<ADMIN_PORT>  regardless of the
+## IP the DHCP server hands out. Since ESP-IDF v5.0 mdns is no longer bundled in
+## the core and must be declared here.
+dependencies:
+  espressif/mdns: "^1.2"
+  idf:
+    version: ">=5.0"

@@ -1,4 +1,5 @@
 #include "telegram.h"
+#include "wifi_manager.h"
 #include "config.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -27,6 +28,7 @@ static char s_boot_ip[INET_ADDRSTRLEN];
 #define EMOJI_IP     "\xF0\x9F\x8C\x8D"   // 🌍
 #define EMOJI_CREDS  "\xF0\x9F\x91\xA4"   // 👤
 #define EMOJI_LOG    "\xF0\x9F\x93\x8B"   // 📋
+#define EMOJI_MAC    "\xF0\x9F\x94\x97"   // 🔗
 
 static const char *s_type_label[] = {"RTSP", "HTTP", "Telnet", "SSH", "FTP"};
 static const char *s_type_emoji[] = {EMOJI_RTSP, EMOJI_HTTP, EMOJI_TELNET, EMOJI_SSH, EMOJI_FTP};
@@ -203,6 +205,18 @@ void telegram_task(void *arg)
         char ip_str[INET_ADDRSTRLEN];
         strlcpy(ip_str, inet_ntoa(ip_addr), sizeof(ip_str));
 
+        // MAC + vendor line. Both come from local sources (ARP cache and a
+        // built-in OUI table) and contain no HTML metacharacters, so no escaping
+        // is needed. vendor is "" when unrecognised → the "(…)" suffix is dropped.
+        char mac_str[WIFI_MAC_STR_LEN];
+        wifi_manager_format_mac(entry.src_mac, mac_str, sizeof(mac_str));
+        const char *vendor = wifi_manager_mac_vendor(entry.src_mac);
+        char mac_line[96];
+        snprintf(mac_line, sizeof(mac_line),
+                 EMOJI_MAC " MAC: <code>%s</code>%s%s%s",
+                 mac_str,
+                 vendor[0] ? " (" : "", vendor, vendor[0] ? ")" : "");
+
         char msg[768];
         if (entry.type == ATTACK_SSH) {
             // SSH: no credentials (auth is encrypted); show client fingerprint only
@@ -210,8 +224,10 @@ void telegram_task(void *arg)
                 EMOJI_ALERT " <b>ShadowSentry S3 Alert</b>\n\n"
                 EMOJI_SSH   " Attack: <b>SSH</b>\n"
                 EMOJI_IP    " IP: <code>%s</code>\n"
+                "%s\n"
                 EMOJI_LOG   " <code>%.200s</code>",
                 ip_str,
+                mac_line,
                 pay_h);
         } else {
             snprintf(msg, sizeof(msg),
@@ -219,11 +235,13 @@ void telegram_task(void *arg)
                 "%s Attack: <b>%s</b>\n"
                 EMOJI_IP    " IP: <code>%s</code>\n"
                 EMOJI_CREDS " Creds: <code>%s:%s</code>\n"
+                "%s\n"
                 EMOJI_LOG   " <code>%.200s</code>",
                 s_type_emoji[entry.type],
                 s_type_label[entry.type],
                 ip_str,
                 user_h, pass_h,
+                mac_line,
                 pay_h);
         }
 

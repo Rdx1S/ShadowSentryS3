@@ -1,5 +1,6 @@
 #include "admin_panel.h"
 #include "log_store.h"
+#include "wifi_manager.h"
 #include "config.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -187,20 +188,28 @@ static void serve_attacks_json(int sock)
             (unsigned long)total, unique,
             by_type[0], by_type[1], by_type[2], by_type[3], by_type[4]);
 
-    for (int i = 0; i < n && remaining > 256; i++) {
+    for (int i = 0; i < n && remaining > 320; i++) {
         // Escape all attacker-supplied strings before embedding in JSON
         char user_j[96],  pass_j[192], pay_j[512];
         json_escape_str(entries[i].username, user_j, sizeof(user_j));
         json_escape_str(entries[i].password, pass_j, sizeof(pass_j));
         json_escape_str(entries[i].payload,  pay_j,  sizeof(pay_j));
 
+        // MAC + vendor: both from local sources (ARP / built-in OUI table),
+        // plain ASCII with no JSON metacharacters — safe to embed directly.
+        char mac_j[WIFI_MAC_STR_LEN];
+        wifi_manager_format_mac(entries[i].src_mac, mac_j, sizeof(mac_j));
+        const char *vendor_j = wifi_manager_mac_vendor(entries[i].src_mac);
+
         if (i > 0) JPRINTF(",");
         JPRINTF("{\"ts\":%lu,\"ip\":%lu,\"type\":%d,"
-                "\"user\":\"%s\",\"pass\":\"%s\",\"payload\":\"%s\"}",
+                "\"user\":\"%s\",\"pass\":\"%s\",\"payload\":\"%s\","
+                "\"mac\":\"%s\",\"vendor\":\"%s\"}",
                 (unsigned long)entries[i].timestamp,
                 (unsigned long)entries[i].src_ip,
                 (int)entries[i].type,
-                user_j, pass_j, pay_j);
+                user_j, pass_j, pay_j,
+                mac_j, vendor_j);
     }
 
     JPRINTF("]}");

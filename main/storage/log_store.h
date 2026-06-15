@@ -14,6 +14,7 @@ typedef enum {
 typedef struct {
     uint32_t      timestamp;     // Unix epoch (seconds)
     uint32_t      src_ip;        // IPv4 in network byte order
+    uint8_t       src_mac[6];    // attacker L2 MAC from ARP; all-zero if unresolved
     attack_type_t type;
     char          username[32];
     char          password[64];
