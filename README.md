@@ -36,12 +36,14 @@ ShadowSentry S3 — автономний апаратний honeypot класу 
 | Протокол | Перехоплюється | Приклад |
 |----------|---------------|---------|
 | RTSP | Username + Password | `admin:12345` з Basic Auth заголовку |
-| HTTP | Username + Password | POST-форма логіну NVR |
+| HTTP | Username + Password + **path + User-Agent** | POST-форма логіну NVR; кожен запит (GET/POST/інше) фінгерпринтиться за шляхом і User-Agent сканера |
 | Telnet | Username + Password | Інтерактивний login prompt (до 5 спроб) |
 | SSH | Client version string | `SSH-2.0-OpenSSH_7.4p1 Debian-10` |
 | FTP | Username + Password | `USER admin` / `PASS password` (RFC 959) |
 
 > SSH не захоплює credentials — після обміну банерами весь трафік шифрується. Натомість version string є корисним fingerprint атакуючого.
+
+> **MAC-адреса для всіх протоколів.** Оскільки атакуючий у тій самій локальній мережі, для кожної події ShadowSentry резолвить його MAC через ARP-таблицю lwIP і показує його разом зі здогадом про виробника (OUI). Рандомізований MAC (приватний, типовий для смартфонів) позначається окремо. MAC видно і в дашборді, і в Telegram-сповіщенні.
 
 ---
 
@@ -171,6 +173,7 @@ I (439) MAIN: ║    ESP32-S3  |  ESP-IDF v5.x         ║
 I (444) MAIN: ╚══════════════════════════════════════╝
 I (1827) WIFI: IP acquired: 192.168.1.105
 I (1830) WIFI: Admin panel → http://192.168.1.105:9999
+I (1842) WIFI: mDNS started → http://hikvision-nvr.local:9999
 I (1904) RTSP: Honeypot listening on port 554
 I (1910) HTTP: Honeypot listening on port 80
 I (1916) TELNET: Honeypot listening on port 23
@@ -182,6 +185,8 @@ I (1938) ADMIN: Admin panel on port 9999
 Відкрити браузер → `http://192.168.1.105:9999`  
 Логін: `admin` / пароль з `ADMIN_PASSWORD`.
 
+> **Не треба запам'ятовувати IP.** Завдяки mDNS пристрій завжди доступний за стабільним іменем — `http://hikvision-nvr.local:9999` — незалежно від того, який адрес видасть DHCP. Працює з коробки на macOS, Linux (avahi), Windows 10+, iOS та Android. Ім'я налаштовується через `MDNS_HOSTNAME` у `config.h`.
+
 ---
 
 ## Admin Dashboard
@@ -190,7 +195,7 @@ Dark-mode веб-інтерфейс з авто-оновленням кожні 
 
 - **6 карток статистики** — Total, Unique IPs, RTSP, HTTP, Telnet, SSH, FTP
 - **Donut chart** — розбивка атак по протоколах у реальному часі
-- **Таблиця атак** — timestamp, IP, протокол, перехоплені credentials, payload
+- **Таблиця атак** — timestamp, IP, **MAC + vendor**, протокол, перехоплені credentials, payload
 - **Footer** — uptime пристрою, вільна heap-пам'ять, рівень Wi-Fi сигналу (RSSI)
 - **Кнопка Clear** — очищення логів з flash-пам'яті
 
@@ -216,8 +221,9 @@ ShadowSentryS3/
 └── main/
     ├── config.h.example        ← Шаблон конфігурації (копіювати в config.h)
     ├── config.h                ← Реальні налаштування (в .gitignore)
+    ├── idf_component.yml        Managed-залежності (espressif/mdns)
     ├── main.c                  Точка входу, розподіл задач по ядрах
-    ├── wifi_manager.c/h        Wi-Fi STA, DHCP hostname, SNTP
+    ├── wifi_manager.c/h        Wi-Fi STA, DHCP hostname, SNTP, mDNS
     ├── index.html              Dashboard HTML (вбудовується в прошивку)
     ├── CMakeLists.txt
     ├── honeypot/               ── Core 0 — Hacker World ──────────────
@@ -263,6 +269,10 @@ ShadowSentryS3/
 - `mbedTLS` — Base64 decode для Basic Auth
 - `SPIFFS` — файлова система у flash
 - `esp_netif_sntp` — синхронізація часу
+
+Один компонент підтягується автоматично менеджером компонентів (описаний у `main/idf_component.yml`, завантажується при першій збірці):
+
+- `espressif/mdns` — `.local` name resolution (доступ до адмінки за іменем)
 
 ---
 

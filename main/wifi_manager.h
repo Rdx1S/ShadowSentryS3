@@ -1,6 +1,7 @@
 #pragma once
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /*
  * WiFi Manager — Station mode + SNTP
@@ -59,3 +60,26 @@ bool wifi_manager_is_connected(void);
 // Copy the current IPv4 address into buf (at least WIFI_IP_STR_LEN bytes).
 // Writes an empty string if not connected. Returns buf for convenience.
 char *wifi_manager_get_ip_str(char *buf, size_t len);
+
+// Buffer size that always fits a formatted MAC ("aa:bb:cc:dd:ee:ff" + NUL,
+// or the literal "unknown").
+#define WIFI_MAC_STR_LEN            18
+
+// Resolve the Ethernet MAC of a same-LAN host from the lwIP ARP cache.
+//   ip_net  — IPv4 in network byte order (e.g. sockaddr_in.sin_addr.s_addr)
+//   mac_out — receives the 6-byte MAC; zeroed if the lookup fails
+// Returns true only when an ARP entry exists. Best-effort: works for hosts on
+// the local segment that the device has exchanged packets with (which an
+// attacker connecting to a honeypot port always has). Runs the lookup in the
+// lwIP TCP/IP thread, so it is safe to call from any honeypot task.
+bool wifi_manager_lookup_mac(uint32_t ip_net, uint8_t mac_out[6]);
+
+// Format a 6-byte MAC as "aa:bb:cc:dd:ee:ff" into buf (>= WIFI_MAC_STR_LEN).
+// Writes "unknown" if mac is all-zero.
+void wifi_manager_format_mac(const uint8_t mac[6], char *buf, size_t len);
+
+// Best-effort manufacturer name from the MAC OUI (first 3 bytes), or a
+// "randomized (private)" hint when the locally-administered bit is set
+// (common for modern phones). Returns "" when the vendor is not recognised.
+// The lookup table is small and curated — absence of a match is expected.
+const char *wifi_manager_mac_vendor(const uint8_t mac[6]);

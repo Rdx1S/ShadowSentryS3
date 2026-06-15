@@ -47,6 +47,8 @@ idf_component_register(
         esp_wifi            # esp_wifi_*
         esp_netif           # esp_netif_*, esp_netif_sntp_init()
         esp_event           # esp_event_loop_create_default()
+        mdns                # managed component espressif/mdns (see idf_component.yml)
+                            # — .local name resolution in wifi_manager.c
 
         # Network stack
         lwip                # BSD sockets (socket/bind/listen/accept/recv/send),

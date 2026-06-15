@@ -48,13 +48,13 @@
 #define ADMIN_RECV_TIMEOUT_S    5
 
 // Maximum number of log entries returned by GET /api/attacks.
-// Each serialised entry is at most ~420 bytes; 50 × 420 = 21 KB fits in
-// ADMIN_JSON_BUF_SIZE with room for the envelope.
+// Each serialised entry is at most ~490 bytes (incl. mac + vendor fields);
+// 50 × 490 ≈ 24 KB fits in ADMIN_JSON_BUF_SIZE with room for the envelope.
 #define ADMIN_MAX_LOG_ENTRIES   50
 
 // Static JSON response buffer size (bytes). Allocated in BSS (not stack).
-// Must fit: envelope (~120 B) + ADMIN_MAX_LOG_ENTRIES × max-entry (~420 B).
-#define ADMIN_JSON_BUF_SIZE     24576   // 24 KB
+// Must fit: envelope (~120 B) + ADMIN_MAX_LOG_ENTRIES × max-entry (~490 B).
+#define ADMIN_JSON_BUF_SIZE     32768   // 32 KB
 
 // FreeRTOS task entry point. Pass NULL as arg.
 // Pin to Core 1 with xTaskCreatePinnedToCore().

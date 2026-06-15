@@ -30,6 +30,28 @@
 
 #define DEVICE_HOSTNAME             "Hikvision-NVR"
 
+// ── mDNS (.local name resolution) ──────────────────────────────────────────────
+//
+// With mDNS enabled the device is always reachable at
+//   http://<MDNS_HOSTNAME>.local:<ADMIN_PORT>
+// from any Mac/Linux/Windows-10+/iOS/Android client on the same LAN — no need
+// to know the DHCP-assigned IP.
+//
+// MDNS_HOSTNAME is the label before ".local": lowercase letters, digits and
+// '-' only (DNS rules). MDNS_INSTANCE is the friendly name shown in service
+// browsers (Bonjour / "Discovery" apps).
+//
+// MDNS_ADVERTISE_ADMIN:
+//   1 = also announce the dashboard as an _http._tcp service, so it appears in
+//       mDNS service-browser tools.
+//   0 = resolve the name only, advertise no service — stealthier, since the
+//       honeypot then does not actively announce an open web port.
+
+#define MDNS_ENABLE                 1
+#define MDNS_HOSTNAME               "hikvision-nvr"
+#define MDNS_INSTANCE               "Hikvision NVR"
+#define MDNS_ADVERTISE_ADMIN        1
+
 // ── WiFi ─────────────────────────────────────────────────────────────────────
 //
 // 2.4 GHz only (ESP32-S3 limitation).
@@ -89,10 +111,14 @@
 // LOG_CTR_PATH   — 4-byte uint32 all-time counter; survives log_store_clear()
 //
 // Memory impact: LOG_RING_SIZE × sizeof(attack_log_t) bytes are allocated in
-// BSS at startup. sizeof(attack_log_t) = 4+4+4+32+64+128 = 236 B (aligned
-// to ~240 B). At the default of 200 entries that is ~47 KB of internal SRAM.
+// BSS at startup. sizeof(attack_log_t) = 4+4+6(+2 pad)+4+32+64+128 ≈ 244 B
+// (aligned to ~248 B). At the default of 200 entries that is ~48 KB of SRAM.
+//
+// LOG_FILE_PATH is versioned ("…2.bin"): the record layout gained a src_mac
+// field, so the previous on-flash dump is a different size and is ignored on
+// upgrade rather than mis-parsed. Old data self-clears on first boot.
 
-#define LOG_FILE_PATH               "/spiffs/attacks.bin"
+#define LOG_FILE_PATH               "/spiffs/attacks2.bin"
 #define LOG_CTR_PATH                "/spiffs/total.bin"
 #define LOG_RING_SIZE               200
 
@@ -107,6 +133,10 @@ _Static_assert(sizeof(ADMIN_PASSWORD) >= 9,
 
 _Static_assert(ADMIN_PORT >= 1024 && ADMIN_PORT <= 65535,
     "ADMIN_PORT must be in range 1024–65535");
+
+// mDNS label: at least 1 char, max 31 (RFC 1035 label limit is 63; keep margin)
+_Static_assert(sizeof(MDNS_HOSTNAME) >= 2 && sizeof(MDNS_HOSTNAME) <= 32,
+    "MDNS_HOSTNAME must be 1–31 characters");
 
 _Static_assert(LOG_RING_SIZE >= 10 && LOG_RING_SIZE <= 500,
     "LOG_RING_SIZE must be 10–500  (500 entries ≈ 117 KB RAM)");
