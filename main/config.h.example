@@ -151,6 +151,19 @@
 #define GEOIP_QUEUE_DEPTH           8       // pending lookups before new ones drop
 #define GEOIP_HTTP_TIMEOUT_MS       5000    // per-lookup HTTP timeout
 
+// ── Wi-Fi threat monitor (radio-layer) ──────────────────────────────────────────
+//
+// Uses promiscuous mode to detect 802.11 deauthentication / disassociation
+// floods on the channel the device is associated to — Wi-Fi DoS attacks that a
+// TCP-stack honeypot can never see. A burst above the threshold within the
+// window raises an ATTACK_WIFI event with the attacker's transmitter MAC.
+// Works while the device stays connected (no channel hopping). All values
+// optional — wifi_monitor.c falls back to these defaults.
+#define WIFI_MON_ENABLE             1       // 0 = disable the monitor task
+#define WIFI_MON_WINDOW_MS          2000    // evaluation window length
+#define WIFI_MON_DEAUTH_THRESHOLD   20      // deauth+disassoc frames/window = flood
+#define WIFI_MON_COOLDOWN_S         60      // min seconds between flood alerts
+
 // ── Compile-time validation ───────────────────────────────────────────────────
 //
 // These assertions fire as build errors, not runtime panics, so
