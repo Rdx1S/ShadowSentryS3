@@ -122,6 +122,22 @@
 #define LOG_CTR_PATH                "/spiffs/total.bin"
 #define LOG_RING_SIZE               200
 
+// ── ARP-spoof / MITM monitor ────────────────────────────────────────────────────
+//
+// Periodically scans the lwIP ARP cache for cache-poisoning signatures and
+// raises an alert (logged + Telegram) on either:
+//   • the gateway's MAC changing after a stable baseline was learned, or
+//   • one MAC claiming two or more distinct IPs (classic poison pattern).
+//
+// Scope: this sees ARP entries the device itself holds, so it detects spoofing
+// that targets this host or is broadcast network-wide (bettercap/ettercap
+// default). A purely point-to-point spoof between two other hosts that never
+// touches this device's cache is out of scope.  All values are optional —
+// arp_monitor.c falls back to these same defaults if they are omitted here.
+#define ARP_MONITOR_ENABLE          1       // 0 = disable the monitor task
+#define ARP_SCAN_INTERVAL_S         8       // seconds between ARP-table scans
+#define ARP_ALERT_COOLDOWN_S        300     // min seconds between alerts per MAC
+
 // ── Compile-time validation ───────────────────────────────────────────────────
 //
 // These assertions fire as build errors, not runtime panics, so

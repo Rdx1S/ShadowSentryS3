@@ -155,6 +155,7 @@ main{flex:1;padding:24px 28px;display:flex;flex-direction:column;gap:20px}
 .fb-telnet{background:rgba(248,113,113,.1);color:var(--red); border:1px solid rgba(248,113,113,.2)}
 .fb-ssh   {background:rgba(56,189,248,.1); color:#38bdf8;   border:1px solid rgba(56,189,248,.2)}
 .fb-ftp   {background:rgba(52,211,153,.1); color:#34d399;   border:1px solid rgba(52,211,153,.2)}
+.fb-arp   {background:rgba(244,114,182,.12);color:#f472b6;  border:1px solid rgba(244,114,182,.28)}
 .feed-empty{color:var(--muted);font-size:.8rem;text-align:center;padding:24px 0}
 
 /* ── Table ── */
@@ -429,12 +430,12 @@ function fmt(ts){
   const d=new Date(ts*1000),p=n=>String(n).padStart(2,'0');
   return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
-const BADGE=['<span class="feed-badge fb-rtsp">RTSP</span>','<span class="feed-badge fb-http">HTTP</span>','<span class="feed-badge fb-telnet">TELNET</span>','<span class="feed-badge fb-ssh">SSH</span>','<span class="feed-badge fb-ftp">FTP</span>'];
-const ICON=['&#128249;','&#128760;','&#128187;','&#128273;','&#128193;'];
+const BADGE=['<span class="feed-badge fb-rtsp">RTSP</span>','<span class="feed-badge fb-http">HTTP</span>','<span class="feed-badge fb-telnet">TELNET</span>','<span class="feed-badge fb-ssh">SSH</span>','<span class="feed-badge fb-ftp">FTP</span>','<span class="feed-badge fb-arp">ARP</span>'];
+const ICON=['&#128249;','&#128760;','&#128187;','&#128273;','&#128193;','&#128376;'];
 const CIRC=2*Math.PI*54;
-const TNAME=['RTSP','HTTP','Telnet','SSH','FTP'];
-const TPORT=[554,80,23,22,21];
-const TDESC=['Fake Hikvision camera','Fake NVR login page','Fake Ubuntu 20.04','OpenSSH fingerprint','Fake vsFTPd 3.0.5'];
+const TNAME=['RTSP','HTTP','Telnet','SSH','FTP','ARP spoof'];
+const TPORT=[554,80,23,22,21,'—'];
+const TDESC=['Fake Hikvision camera','Fake NVR login page','Fake Ubuntu 20.04','OpenSSH fingerprint','Fake vsFTPd 3.0.5','MITM / ARP cache poisoning'];
 
 // ── Detail modal ──
 let _entries=[];

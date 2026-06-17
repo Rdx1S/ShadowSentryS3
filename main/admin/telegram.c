@@ -29,9 +29,10 @@ static char s_boot_ip[INET_ADDRSTRLEN];
 #define EMOJI_CREDS  "\xF0\x9F\x91\xA4"   // 👤
 #define EMOJI_LOG    "\xF0\x9F\x93\x8B"   // 📋
 #define EMOJI_MAC    "\xF0\x9F\x94\x97"   // 🔗
+#define EMOJI_ARP    "\xF0\x9F\x95\xB8"   // 🕸  (U+1F578 — spoof / MITM web)
 
-static const char *s_type_label[] = {"RTSP", "HTTP", "Telnet", "SSH", "FTP"};
-static const char *s_type_emoji[] = {EMOJI_RTSP, EMOJI_HTTP, EMOJI_TELNET, EMOJI_SSH, EMOJI_FTP};
+static const char *s_type_label[] = {"RTSP", "HTTP", "Telnet", "SSH", "FTP", "ARP"};
+static const char *s_type_emoji[] = {EMOJI_RTSP, EMOJI_HTTP, EMOJI_TELNET, EMOJI_SSH, EMOJI_FTP, EMOJI_ARP};
 
 // ── String escaping helpers ───────────────────────────────────────────────────
 
@@ -218,7 +219,19 @@ void telegram_task(void *arg)
                  vendor[0] ? " (" : "", vendor, vendor[0] ? ")" : "");
 
         char msg[768];
-        if (entry.type == ATTACK_SSH) {
+        if (entry.type == ATTACK_ARP) {
+            // ARP / MITM: network-level event, no credentials. The payload holds
+            // the description (e.g. "Gateway 192.168.1.1 MAC changed ...").
+            snprintf(msg, sizeof(msg),
+                EMOJI_ALERT " <b>ShadowSentry S3 Alert</b>\n\n"
+                EMOJI_ARP   " Attack: <b>ARP spoofing / MITM</b>\n"
+                EMOJI_IP    " IP: <code>%s</code>\n"
+                "%s\n"
+                EMOJI_LOG   " <code>%.200s</code>",
+                ip_str,
+                mac_line,
+                pay_h);
+        } else if (entry.type == ATTACK_SSH) {
             // SSH: no credentials (auth is encrypted); show client fingerprint only
             snprintf(msg, sizeof(msg),
                 EMOJI_ALERT " <b>ShadowSentry S3 Alert</b>\n\n"

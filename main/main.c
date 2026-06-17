@@ -13,6 +13,7 @@
 #include "ftp_trap.h"
 #include "admin_panel.h"
 #include "telegram.h"
+#include "arp_monitor.h"
 #include "config.h"
 
 static const char *TAG = "MAIN";
@@ -54,12 +55,17 @@ static const char *TAG = "MAIN";
 #define STACK_FTP       3072
 #define STACK_TELEGRAM  8192
 #define STACK_ADMIN     8192
+//  arpmon : tbl[16]×10B (160) + MAC/IP format buffers + detail[128]
+//           + overhead (~1200)  → 3072 gives ~1.3 KB headroom
+#define STACK_ARPMON    3072
 
 // Priority 5 = equal to lwIP core; keeps honeypot latency low.
 // Telegram is 3 — non-critical, may wait behind WiFi driver work on Core 1.
+// ARP monitor is 2 — periodic background scan, lowest of the lot.
 #define PRIO_HONEYPOT   5
 #define PRIO_ADMIN      5
 #define PRIO_TELEGRAM   3
+#define PRIO_ARPMON     2
 
 // ── Helper macro ──────────────────────────────────────────────────────────────
 
@@ -137,6 +143,7 @@ void app_main(void)
 #endif
     ESP_LOGI(TAG, "  │  Telegram alerts: %s",
              (TELEGRAM_BOT_TOKEN[0] == 'Y') ? "NOT CONFIGURED" : "enabled");
+    ESP_LOGI(TAG, "  │  ARP-spoof / MITM monitor: active");
     ESP_LOGI(TAG, "  └─────────────────────────────────────────");
     ESP_LOGI(TAG, "");
 
@@ -154,6 +161,7 @@ void app_main(void)
     telegram_set_boot_ip(ip);
     SPAWN(telegram_task,    "tg",     STACK_TELEGRAM, PRIO_TELEGRAM, 1);
     SPAWN(admin_panel_task, "admin",  STACK_ADMIN,    PRIO_ADMIN,    1);
+    SPAWN(arp_monitor_task, "arpmon", STACK_ARPMON,   PRIO_ARPMON,   1);
 
     ESP_LOGI(TAG, "All tasks spawned — free heap: %lu B",
              (unsigned long)esp_get_free_heap_size());

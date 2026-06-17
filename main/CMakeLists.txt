@@ -23,6 +23,7 @@ idf_component_register(
     SRCS
         "main.c"
         "wifi_manager.c"
+        "arp_monitor.c"
         "honeypot/rtsp_trap.c"
         "honeypot/http_trap.c"
         "honeypot/telnet_trap.c"
