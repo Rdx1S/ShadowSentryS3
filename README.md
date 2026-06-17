@@ -54,6 +54,8 @@ Attacker / bot
 
 > **MAC address for every protocol.** Since the attacker is on the same local network, for each event ShadowSentry resolves their MAC via the lwIP ARP table and shows it together with a best-effort vendor guess (OUI). A randomized MAC (private, typical for smartphones) is flagged separately. The MAC is shown both in the dashboard and in the Telegram alert.
 
+> **Threat-intel enrichment.** A background worker resolves each attacker IP to its country, ISP/ASN and a reputation tag (`hosting` / `proxy` / `mobile`) via [ip-api.com](https://ip-api.com) — free and key-less, so it works the moment you flash it. The result (with a country flag) shows in the dashboard and the Telegram alert; private/LAN source IPs are labelled `Private LAN` without any external call. Lookups run off the hot path and are cached by IP. Tunable via `GEOIP_ENABLE` / `GEOIP_CACHE_SIZE` in `config.h`.
+
 > **ARP-spoof / MITM monitor.** A background task periodically scans the lwIP ARP cache for cache-poisoning signatures — the gateway's MAC changing after a stable baseline is learned, or one MAC claiming several IPs — and raises an `ARP` event (dashboard feed + Telegram) when it sees one. This catches L2 man-in-the-middle attacks that the port honeypots are blind to, since they never complete a TCP handshake. Scope: it detects spoofing that targets this host or is broadcast network-wide (the default for bettercap/ettercap); a strictly point-to-point spoof between two other hosts is out of scope. Tunable via `ARP_MONITOR_ENABLE` / `ARP_SCAN_INTERVAL_S` / `ARP_ALERT_COOLDOWN_S` in `config.h`.
 
 **Detection in action.** Verified on real ESP32-S3 hardware against a live `bettercap` ARP spoof — the instant the attacker poisoned the board's gateway entry, the monitor logged it and pushed a Telegram alert (values below are anonymized):
@@ -241,7 +243,9 @@ ShadowSentryS3/
     ├── config.h                ← Real settings (in .gitignore)
     ├── idf_component.yml        Managed dependencies (espressif/mdns)
     ├── main.c                  Entry point, task distribution across cores
-    ├── wifi_manager.c/h        Wi-Fi STA, DHCP hostname, SNTP, mDNS
+    ├── wifi_manager.c/h        Wi-Fi STA, DHCP hostname, SNTP, mDNS, ARP helpers
+    ├── arp_monitor.c/h         ARP-spoof / MITM detector              (Core 1)
+    ├── geoip.c/h               Threat-intel enrichment (ip-api.com)   (Core 1)
     ├── index.html              Dashboard HTML (embedded into the firmware)
     ├── CMakeLists.txt
     ├── honeypot/               ── Core 0 — Hacker World ──────────────

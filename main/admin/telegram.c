@@ -1,5 +1,6 @@
 #include "telegram.h"
 #include "wifi_manager.h"
+#include "geoip.h"
 #include "config.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -30,6 +31,25 @@ static char s_boot_ip[INET_ADDRSTRLEN];
 #define EMOJI_LOG    "\xF0\x9F\x93\x8B"   // 📋
 #define EMOJI_MAC    "\xF0\x9F\x94\x97"   // 🔗
 #define EMOJI_ARP    "\xF0\x9F\x95\xB8"   // 🕸  (U+1F578 — spoof / MITM web)
+#define EMOJI_GEO    "\xF0\x9F\x93\x8D"   // 📍 (U+1F4CD — geolocation)
+
+// Convert a 2-letter ISO country code into its flag emoji (two regional-
+// indicator code points, 8 UTF-8 bytes + NUL). Writes "" for an invalid code.
+static void cc_flag(const char *cc, char *out)
+{
+    out[0] = '\0';
+    if (!cc || cc[0] < 'A' || cc[0] > 'Z' || cc[1] < 'A' || cc[1] > 'Z' || cc[2])
+        return;
+    int o = 0;
+    for (int i = 0; i < 2; i++) {
+        unsigned cp = 0x1F1E6u + (unsigned)(cc[i] - 'A');   // regional indicator
+        out[o++] = (char)(0xF0 | (cp >> 18));
+        out[o++] = (char)(0x80 | ((cp >> 12) & 0x3F));
+        out[o++] = (char)(0x80 | ((cp >> 6)  & 0x3F));
+        out[o++] = (char)(0x80 | (cp & 0x3F));
+    }
+    out[o] = '\0';
+}
 
 static const char *s_type_label[] = {"RTSP", "HTTP", "Telnet", "SSH", "FTP", "ARP"};
 static const char *s_type_emoji[] = {EMOJI_RTSP, EMOJI_HTTP, EMOJI_TELNET, EMOJI_SSH, EMOJI_FTP, EMOJI_ARP};
@@ -212,11 +232,34 @@ void telegram_task(void *arg)
         char mac_str[WIFI_MAC_STR_LEN];
         wifi_manager_format_mac(entry.src_mac, mac_str, sizeof(mac_str));
         const char *vendor = wifi_manager_mac_vendor(entry.src_mac);
-        char mac_line[96];
-        snprintf(mac_line, sizeof(mac_line),
+        char mac_line[256];
+        int ml = snprintf(mac_line, sizeof(mac_line),
                  EMOJI_MAC " MAC: <code>%s</code>%s%s%s",
                  mac_str,
                  vendor[0] ? " (" : "", vendor, vendor[0] ? ")" : "");
+
+        // Append a threat-intel line if this IP has been enriched. Read-only
+        // cache lookup; absent for a brand-new IP (shows on the dashboard once
+        // the background worker resolves it). country/org are API-supplied →
+        // HTML-escaped; cc/asn/tag are constrained tokens, safe as-is.
+        geoip_info_t gi;
+        if (ml > 0 && ml < (int)sizeof(mac_line) &&
+            geoip_lookup(entry.src_ip, &gi) && (gi.country[0] || gi.org[0])) {
+            char flag[12]; cc_flag(gi.cc, flag);
+            char ctry_h[40], org_h[100];
+            html_escape(gi.country[0] ? gi.country : "?", ctry_h, sizeof(ctry_h));
+            html_escape(gi.org, org_h, sizeof(org_h));
+            snprintf(mac_line + ml, sizeof(mac_line) - ml,
+                     "\n" EMOJI_GEO " Geo: %s%s%s%s%s%s%s%s",
+                     flag, flag[0] ? " " : "", ctry_h,
+                     org_h[0] ? " \xC2\xB7 " : "", org_h,              // " · "
+                     gi.asn[0] ? " (" : "", gi.asn, gi.asn[0] ? ")" : "");
+            // reputation tag (proxy/hosting/mobile) on the same line, if any
+            if (gi.tag[0]) {
+                size_t cur = strlen(mac_line);
+                snprintf(mac_line + cur, sizeof(mac_line) - cur, " [%s]", gi.tag);
+            }
+        }
 
         char msg[768];
         if (entry.type == ATTACK_ARP) {

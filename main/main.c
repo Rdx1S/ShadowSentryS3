@@ -14,6 +14,7 @@
 #include "admin_panel.h"
 #include "telegram.h"
 #include "arp_monitor.h"
+#include "geoip.h"
 #include "config.h"
 
 static const char *TAG = "MAIN";
@@ -58,6 +59,10 @@ static const char *TAG = "MAIN";
 //  arpmon : tbl[16]×10B (160) + MAC/IP format buffers + detail[128]
 //           + overhead (~1200)  → 3072 gives ~1.3 KB headroom
 #define STACK_ARPMON    3072
+//  geoip  : esp_http_client GET + body[512] + parse temporaries
+//           + client internal frame (~1.5 KB) + overhead (~1 KB)
+//           → 5120 gives ~2 KB headroom
+#define STACK_GEOIP     5120
 
 // Priority 5 = equal to lwIP core; keeps honeypot latency low.
 // Telegram is 3 — non-critical, may wait behind WiFi driver work on Core 1.
@@ -66,6 +71,7 @@ static const char *TAG = "MAIN";
 #define PRIO_ADMIN      5
 #define PRIO_TELEGRAM   3
 #define PRIO_ARPMON     2
+#define PRIO_GEOIP      3
 
 // ── Helper macro ──────────────────────────────────────────────────────────────
 
@@ -144,6 +150,7 @@ void app_main(void)
     ESP_LOGI(TAG, "  │  Telegram alerts: %s",
              (TELEGRAM_BOT_TOKEN[0] == 'Y') ? "NOT CONFIGURED" : "enabled");
     ESP_LOGI(TAG, "  │  ARP-spoof / MITM monitor: active");
+    ESP_LOGI(TAG, "  │  Threat-intel enrichment: ip-api.com");
     ESP_LOGI(TAG, "  └─────────────────────────────────────────");
     ESP_LOGI(TAG, "");
 
@@ -159,6 +166,7 @@ void app_main(void)
     // ── Core 1 — Admin World ─────────────────────────────────────────────────
     // Pass IP to telegram before spawning so the task can send the boot alert.
     telegram_set_boot_ip(ip);
+    SPAWN(geoip_task,       "geoip",  STACK_GEOIP,    PRIO_GEOIP,    1);
     SPAWN(telegram_task,    "tg",     STACK_TELEGRAM, PRIO_TELEGRAM, 1);
     SPAWN(admin_panel_task, "admin",  STACK_ADMIN,    PRIO_ADMIN,    1);
     SPAWN(arp_monitor_task, "arpmon", STACK_ARPMON,   PRIO_ARPMON,   1);

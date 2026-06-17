@@ -1,4 +1,5 @@
 #include "log_store.h"
+#include "geoip.h"
 #include "config.h"
 #include "esp_log.h"
 #include "esp_spiffs.h"
@@ -104,6 +105,10 @@ void log_store_append(const attack_log_t *entry)
     s_total++;
 
     xSemaphoreGive(s_mutex);
+
+    // Kick off async threat-intel enrichment for this attacker IP (non-blocking;
+    // result is cached by IP and read later by the dashboard / Telegram).
+    geoip_enqueue(entry->src_ip);
 
     if (!s_spiffs_ok) return;
 
