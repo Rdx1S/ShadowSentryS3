@@ -9,6 +9,7 @@ typedef enum {
     ATTACK_TELNET = 2,
     ATTACK_SSH    = 3,
     ATTACK_FTP    = 4,
+    ATTACK_ARP    = 5,   // ARP-spoof / MITM detection (not a port honeypot)
 } attack_type_t;
 
 typedef struct {

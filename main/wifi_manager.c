@@ -264,6 +264,64 @@ bool wifi_manager_lookup_mac(uint32_t ip_net, uint8_t mac_out[6])
     return q.found;
 }
 
+bool wifi_manager_get_gateway(uint32_t *gw_net)
+{
+    if (!gw_net || !s_sta_netif) return false;
+    esp_netif_ip_info_t info;
+    if (esp_netif_get_ip_info(s_sta_netif, &info) != ESP_OK) return false;
+    if (info.gw.addr == 0) return false;
+    *gw_net = info.gw.addr;        // esp_ip4_addr_t is network byte order
+    return true;
+}
+
+// ── ARP table snapshot ──────────────────────────────────────────────────────────
+// Walks the lwIP ARP cache from inside the TCP/IP thread (core locking is off in
+// this build) and copies stable IP↔MAC pairs out. Consumed by the ARP-spoof
+// monitor to spot poisoning (a MAC owning several IPs, or the gateway flipping).
+
+typedef struct {
+    wifi_arp_entry_t *out;
+    int               max;
+    volatile int      count;
+    SemaphoreHandle_t done;
+} arp_snap_t;
+
+static void arp_snap_cb(void *arg)
+{
+    arp_snap_t *q = (arp_snap_t *)arg;
+    int c = 0;
+
+    for (size_t i = 0; i < ARP_TABLE_SIZE && c < q->max; i++) {
+        ip4_addr_t      *ip  = NULL;
+        struct netif    *nif = NULL;
+        struct eth_addr *eth = NULL;
+        // Returns 1 only for entries in the STABLE state (not pending/empty).
+        if (etharp_get_entry(i, &ip, &nif, &eth) == 1 && ip && eth) {
+            q->out[c].ip = ip->addr;
+            memcpy(q->out[c].mac, eth->addr, 6);
+            c++;
+        }
+    }
+
+    q->count = c;
+    xSemaphoreGive(q->done);
+}
+
+int wifi_manager_arp_snapshot(wifi_arp_entry_t *out, int max)
+{
+    if (!out || max <= 0 || !s_sta_netif) return 0;
+
+    arp_snap_t q = { .out = out, .max = max, .count = 0 };
+    q.done = xSemaphoreCreateBinary();
+    if (!q.done) return 0;
+
+    if (tcpip_callback(arp_snap_cb, &q) == ERR_OK)
+        xSemaphoreTake(q.done, portMAX_DELAY);
+
+    vSemaphoreDelete(q.done);
+    return q.count;
+}
+
 void wifi_manager_format_mac(const uint8_t mac[6], char *buf, size_t len)
 {
     static const uint8_t zero[6] = {0};

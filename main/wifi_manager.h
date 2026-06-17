@@ -83,3 +83,23 @@ void wifi_manager_format_mac(const uint8_t mac[6], char *buf, size_t len);
 // (common for modern phones). Returns "" when the vendor is not recognised.
 // The lookup table is small and curated — absence of a match is expected.
 const char *wifi_manager_mac_vendor(const uint8_t mac[6]);
+
+// Maximum number of ARP entries copied by wifi_manager_arp_snapshot().
+// lwIP's default ARP_TABLE_SIZE is 10; 16 leaves headroom.
+#define WIFI_ARP_MAX_ENTRIES        16
+
+// One resolved ARP-cache entry: IPv4 (network byte order) <-> Ethernet MAC.
+typedef struct {
+    uint32_t ip;            // network byte order (matches sockaddr_in.sin_addr)
+    uint8_t  mac[6];
+} wifi_arp_entry_t;
+
+// Copy the current default gateway's IPv4 (network byte order) into *gw_net.
+// Returns false if not connected or the gateway is unknown (0.0.0.0).
+bool wifi_manager_get_gateway(uint32_t *gw_net);
+
+// Snapshot the stable entries of the lwIP ARP cache into out[] (up to max),
+// returning the number copied. Safe to call from any task — the actual table
+// walk is marshalled into the lwIP TCP/IP thread via tcpip_callback(), the same
+// way wifi_manager_lookup_mac() is. Used by the ARP-spoof / MITM monitor.
+int wifi_manager_arp_snapshot(wifi_arp_entry_t *out, int max);
