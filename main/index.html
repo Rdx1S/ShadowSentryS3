@@ -436,6 +436,9 @@ const CIRC=2*Math.PI*54;
 const TNAME=['RTSP','HTTP','Telnet','SSH','FTP','ARP spoof'];
 const TPORT=[554,80,23,22,21,'—'];
 const TDESC=['Fake Hikvision camera','Fake NVR login page','Fake Ubuntu 20.04','OpenSSH fingerprint','Fake vsFTPd 3.0.5','MITM / ARP cache poisoning'];
+// ISO country code -> flag emoji (two regional-indicator code points)
+const flagOf=c=>(c&&c.length===2&&/^[A-Za-z]{2}$/.test(c))
+  ?String.fromCodePoint(...[...c.toUpperCase()].map(x=>0x1F1E6+x.charCodeAt(0)-65)):'';
 
 // ── Detail modal ──
 let _entries=[];
@@ -451,10 +454,16 @@ function showDetailKey(key){
   document.getElementById('d-title').textContent=name+' attack';
   document.getElementById('d-sub').textContent=`Port ${TPORT[e.type]||'?'} · ${TDESC[e.type]||''}`;
   const v=s=>s?esc(s):'<span class="muted">—</span>';
+  const geoStr=(e.country||e.org)
+    ? `${flagOf(e.cc)} ${esc(e.country||'')}${e.org?' · '+esc(e.org):''}`
+      +`${e.asn?' <span class="muted">('+esc(e.asn)+')</span>':''}`
+      +`${e.geotag?' <span class="vendor-chip">'+esc(e.geotag)+'</span>':''}`
+    : '';
   const rows=[
     ['Time', esc(fmt(e.ts))],
     ['Protocol', `${esc(name)} <span class="muted">· port ${TPORT[e.type]||'?'}</span>`],
-    ['Source IP', esc(ip)],
+    ['Source IP', `${flagOf(e.cc)} ${esc(ip)}`.trim()],
+    ['Location', geoStr||'<span class="muted">—</span>'],
     ['MAC', mac?esc(mac):'<span class="muted">unknown</span>'],
     ['Vendor', v(e.vendor)],
     ['Username', v(e.user)],
@@ -470,6 +479,7 @@ function showDetailKey(key){
     `Time:     ${fmt(e.ts)}\n`+
     `Protocol: ${name} (port ${TPORT[e.type]||'?'})\n`+
     `IP:       ${ip}\n`+
+    `Location: ${(e.country||e.org)?`${e.country||''}${e.org?' · '+e.org:''}${e.asn?' ('+e.asn+')':''}${e.geotag?' ['+e.geotag+']':''}`:'-'}\n`+
     `MAC:      ${mac||'unknown'}${e.vendor?' ('+e.vendor+')':''}\n`+
     `Creds:    ${e.user||'-'} : ${e.pass||'-'}\n`+
     `Payload:  ${e.payload||'-'}`;
@@ -535,8 +545,9 @@ function updateFeed(entries){
     div.className='feed-item';
     div.setAttribute('onclick',`showDetailKey('${e.ts}-${e.ip}-${e.type}')`);
     const vchip=e.vendor?`<span class="vendor-chip">${esc(e.vendor)}</span>`:'';
+    const fl=flagOf(e.cc);
     div.innerHTML=`<span class="feed-icon">${ICON[e.type]||'?'}</span>`+
-      `<div class="feed-info"><div class="fi-ip">${ip4(e.ip)}${vchip}</div><div class="fi-cred">${cred}</div></div>`+
+      `<div class="feed-info"><div class="fi-ip">${fl?fl+' ':''}${ip4(e.ip)}${vchip}</div><div class="fi-cred">${cred}</div></div>`+
       `${BADGE[e.type]||''}<span class="feed-time">${fmt(e.ts).split(' ')[1]||''}</span>`;
     feed.insertBefore(div,feed.firstChild);
   });
@@ -550,7 +561,7 @@ function updateTable(entries){
   if(!entries.length){tb.innerHTML='<tr class="empty-row"><td colspan="7">&#10003; No attacks recorded yet</td></tr>';return;}
   tb.innerHTML=entries.map(e=>`<tr onclick="showDetailKey('${e.ts}-${e.ip}-${e.type}')">
     <td class="td-ts">${fmt(e.ts)}</td>
-    <td class="td-ip">${ip4(e.ip)}</td>
+    <td class="td-ip">${flagOf(e.cc)?flagOf(e.cc)+' ':''}${ip4(e.ip)}</td>
     <td class="td-mac">${macCell(e)}</td>
     <td>${BADGE[e.type]||e.type}</td>
     <td class="td-cred">${e.user?esc(e.user):'—'}</td>

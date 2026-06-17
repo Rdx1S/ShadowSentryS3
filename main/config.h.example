@@ -138,6 +138,19 @@
 #define ARP_SCAN_INTERVAL_S         8       // seconds between ARP-table scans
 #define ARP_ALERT_COOLDOWN_S        300     // min seconds between alerts per MAC
 
+// ── GeoIP / threat-intel enrichment ─────────────────────────────────────────────
+//
+// Resolves each attacker IP to country + ISP/ASN + a reputation tag
+// (hosting/proxy/mobile) and shows it in the dashboard and Telegram alert.
+// Provider is ip-api.com — free and key-less, so this works out of the box.
+// Private / LAN source IPs are labelled "Private LAN" without any network call.
+// A background worker does the lookup, so the honeypots never block; results are
+// cached by IP in RAM. All values optional — geoip.c falls back to these defaults.
+#define GEOIP_ENABLE                1       // 0 = disable enrichment entirely
+#define GEOIP_CACHE_SIZE            24      // distinct IPs kept in the RAM cache
+#define GEOIP_QUEUE_DEPTH           8       // pending lookups before new ones drop
+#define GEOIP_HTTP_TIMEOUT_MS       5000    // per-lookup HTTP timeout
+
 // ── Compile-time validation ───────────────────────────────────────────────────
 //
 // These assertions fire as build errors, not runtime panics, so

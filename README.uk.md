@@ -54,6 +54,8 @@ ShadowSentry S3 — автономний апаратний honeypot класу 
 
 > **MAC-адреса для всіх протоколів.** Оскільки атакуючий у тій самій локальній мережі, для кожної події ShadowSentry резолвить його MAC через ARP-таблицю lwIP і показує його разом зі здогадом про виробника (OUI). Рандомізований MAC (приватний, типовий для смартфонів) позначається окремо. MAC видно і в дашборді, і в Telegram-сповіщенні.
 
+> **Threat-intel збагачення.** Фоновий воркер резолвить кожен IP атакуючого у країну, ISP/ASN і репутаційний тег (`hosting` / `proxy` / `mobile`) через [ip-api.com](https://ip-api.com) — безкоштовно й без API-ключа, тож працює одразу після прошивки. Результат (з прапором країни) показується в дашборді та Telegram-алерті; приватні/LAN IP позначаються `Private LAN` без зовнішнього запиту. Запити йдуть поза гарячим шляхом і кешуються за IP. Налаштовується через `GEOIP_ENABLE` / `GEOIP_CACHE_SIZE` у `config.h`.
+
 > **Детектор ARP-spoof / MITM.** Фонова задача періодично сканує ARP-кеш lwIP на ознаки отруєння — зміну MAC шлюзу після того, як вивчено стабільний baseline, або один MAC, що претендує на кілька IP — і піднімає подію `ARP` (стрічка дашборду + Telegram). Це ловить L2 man-in-the-middle атаки, до яких порт-пастки сліпі (вони ніколи не завершують TCP-handshake). Межі: детектиться спуфінг, націлений на цей хост або broadcast по всій мережі (типове для bettercap/ettercap); строго point-to-point спуфінг між двома іншими хостами — поза межами. Налаштовується через `ARP_MONITOR_ENABLE` / `ARP_SCAN_INTERVAL_S` / `ARP_ALERT_COOLDOWN_S` у `config.h`.
 
 **Детекція в дії.** Перевірено на реальній платі ESP32-S3 проти живого `bettercap` ARP-спуфу — щойно атакуючий отруїв запис шлюзу в кеші плати, монітор залогував це й надіслав Telegram-алерт (значення нижче анонімізовані):
@@ -241,7 +243,9 @@ ShadowSentryS3/
     ├── config.h                ← Реальні налаштування (в .gitignore)
     ├── idf_component.yml        Managed-залежності (espressif/mdns)
     ├── main.c                  Точка входу, розподіл задач по ядрах
-    ├── wifi_manager.c/h        Wi-Fi STA, DHCP hostname, SNTP, mDNS
+    ├── wifi_manager.c/h        Wi-Fi STA, DHCP hostname, SNTP, mDNS, ARP-хелпери
+    ├── arp_monitor.c/h         Детектор ARP-spoof / MITM              (Core 1)
+    ├── geoip.c/h               Threat-intel збагачення (ip-api.com)   (Core 1)
     ├── index.html              Dashboard HTML (вбудовується в прошивку)
     ├── CMakeLists.txt
     ├── honeypot/               ── Core 0 — Hacker World ──────────────
