@@ -81,16 +81,24 @@ static void add_client(int fd)
 
 // ── Broadcast (runs on the httpd task via httpd_queue_work) ──────────────────────
 
-typedef struct { char json[512]; } ws_msg_t;
+// Carries a raw copy of the entry — NOT a pre-formatted string. The ~1 KB of
+// stack that format_entry_json() needs must be spent on the httpd task, never on
+// the appending task: honeypot traps like FTP run on a 3 KB stack and would
+// overflow if the formatting happened in their context.
+typedef struct { attack_log_t e; } ws_msg_t;
 
 static void broadcast_work(void *arg)
 {
     ws_msg_t *m = (ws_msg_t *)arg;
+    char json[512];
+    format_entry_json(&m->e, json, sizeof(json));      // heavy work on httpd stack
+    free(m);
+
     httpd_ws_frame_t f = {
         .final   = true,
         .type    = HTTPD_WS_TYPE_TEXT,
-        .payload = (uint8_t *)m->json,
-        .len     = strlen(m->json),
+        .payload = (uint8_t *)json,
+        .len     = strlen(json),
     };
     for (int i = 0; i < ADMIN_WS_MAX_CLIENTS; i++) {
         if (s_clients[i] < 0) continue;
@@ -99,17 +107,17 @@ static void broadcast_work(void *arg)
             s_clients[i] = -1;
         }
     }
-    free(m);
 }
 
-// log_store listener — runs in the appending task; just hands off to the httpd
-// task so the actual socket I/O never blocks a honeypot/monitor task.
+// log_store listener — runs in the appending (honeypot/monitor) task, so it must
+// stay tiny: just copy the raw entry and hand off to the httpd task. All string
+// formatting and socket I/O happen there, off the caller's (small) stack.
 static void on_attack(const attack_log_t *e)
 {
     if (!s_server) return;
     ws_msg_t *m = (ws_msg_t *)malloc(sizeof(*m));
     if (!m) return;
-    format_entry_json(e, m->json, sizeof(m->json));
+    m->e = *e;
     if (httpd_queue_work(s_server, broadcast_work, m) != ESP_OK) free(m);
 }
 
@@ -144,6 +152,7 @@ void ws_server_start(void)
     cfg.ctrl_port        = ADMIN_WS_PORT + 1;        // own control port (distinct)
     cfg.max_open_sockets = ADMIN_WS_MAX_CLIENTS + 1;
     cfg.lru_purge_enable = true;
+    cfg.stack_size       = 8192;                     // broadcast_work formats JSON here
 
     if (httpd_start(&s_server, &cfg) != ESP_OK) {
         ESP_LOGE(TAG, "httpd_start failed — live push disabled");
