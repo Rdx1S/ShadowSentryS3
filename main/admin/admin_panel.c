@@ -163,10 +163,10 @@ static void serve_attacks_json(int sock)
 
     // Compute per-type counts and unique-IP count from the current window
     int      unique   = 0;
-    int      by_type[5] = {0};
+    int      by_type[8] = {0};   // RTSP,HTTP,Telnet,SSH,FTP,ARP,WiFi,Shell
 
     for (int i = 0; i < n; i++) {
-        if ((int)entries[i].type < 5)
+        if ((int)entries[i].type < 8)
             by_type[(int)entries[i].type]++;
 
         bool dup = false;
@@ -189,9 +189,10 @@ static void serve_attacks_json(int sock)
 } while(0)
 
     JPRINTF("{\"total\":%lu,\"unique_ips\":%d,"
-            "\"by_type\":[%d,%d,%d,%d,%d],\"entries\":[",
+            "\"by_type\":[%d,%d,%d,%d,%d,%d,%d,%d],\"entries\":[",
             (unsigned long)total, unique,
-            by_type[0], by_type[1], by_type[2], by_type[3], by_type[4]);
+            by_type[0], by_type[1], by_type[2], by_type[3],
+            by_type[4], by_type[5], by_type[6], by_type[7]);
 
     for (int i = 0; i < n && remaining > 480; i++) {
         // Escape all attacker-supplied strings before embedding in JSON

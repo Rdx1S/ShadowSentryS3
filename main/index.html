@@ -127,6 +127,10 @@ main{flex:1;padding:24px 28px;display:flex;flex-direction:column;gap:20px}
 .donut-center .dc-lbl{font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
 .legend{display:flex;flex-direction:column;gap:8px}
 .legend-item{display:flex;align-items:center;gap:8px;font-size:.75rem}
+.legend-item[data-ftype]{cursor:pointer;border-radius:6px;padding:2px 4px;margin:-2px -4px;transition:background .15s}
+.legend-item[data-ftype]:hover{background:rgba(255,255,255,.05)}
+.stat-card[data-ftype],.stat-card.c-total,.stat-card.c-ips{cursor:pointer}
+.flt-on{outline:1.5px solid #38bdf8;outline-offset:2px}
 .legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .legend-item .lname{flex:1;color:var(--text)}
 .legend-item .lval{color:var(--muted);font-variant-numeric:tabular-nums;min-width:20px;text-align:right}
@@ -265,43 +269,43 @@ footer{
 <main>
 
   <div class="stats-row">
-    <div class="stat-card c-total">
+    <div class="stat-card c-total" onclick="setFilter(null)" title="Show all">
       <div class="icon">&#9889;</div>
       <div class="val" id="s-total">0</div>
       <div class="label">Total Attacks</div>
       <div class="sub">All-time counter</div>
     </div>
-    <div class="stat-card c-ips">
+    <div class="stat-card c-ips" onclick="setFilter(null)" title="Show all">
       <div class="icon">&#127758;</div>
       <div class="val" id="s-ips">0</div>
       <div class="label">Unique IPs</div>
       <div class="sub">Distinct attackers</div>
     </div>
-    <div class="stat-card c-rtsp">
+    <div class="stat-card c-rtsp" data-ftype="0" onclick="setFilter(0)">
       <div class="icon">&#128249;</div>
       <div class="val" id="s-rtsp">0</div>
       <div class="label">RTSP Hits</div>
       <div class="sub">Port 554 · Mirai bots</div>
     </div>
-    <div class="stat-card c-http">
+    <div class="stat-card c-http" data-ftype="1" onclick="setFilter(1)">
       <div class="icon">&#128760;</div>
       <div class="val" id="s-http">0</div>
       <div class="label">HTTP Hits</div>
       <div class="sub">Port 80 · Fake Hikvision</div>
     </div>
-    <div class="stat-card c-telnet">
+    <div class="stat-card c-telnet" data-ftype="2" onclick="setFilter(2)">
       <div class="icon">&#128187;</div>
       <div class="val" id="s-telnet">0</div>
       <div class="label">Telnet Hits</div>
       <div class="sub">Port 23 · Bruteforce</div>
     </div>
-    <div class="stat-card c-ssh">
+    <div class="stat-card c-ssh" data-ftype="3" onclick="setFilter(3)">
       <div class="icon">&#128273;</div>
       <div class="val" id="s-ssh">0</div>
       <div class="label">SSH Hits</div>
-      <div class="sub">Port 22 · Version harvest</div>
+      <div class="sub">Port 22 · Login capture</div>
     </div>
-    <div class="stat-card c-ftp">
+    <div class="stat-card c-ftp" data-ftype="4" onclick="setFilter(4)">
       <div class="icon">&#128193;</div>
       <div class="val" id="s-ftp">0</div>
       <div class="label">FTP Hits</div>
@@ -321,6 +325,9 @@ footer{
           <circle id="arc-telnet" cx="70" cy="70" r="54" fill="none" stroke="#f87171" stroke-width="16" stroke-dasharray="0 340" stroke-linecap="round"/>
           <circle id="arc-ssh"    cx="70" cy="70" r="54" fill="none" stroke="#38bdf8" stroke-width="16" stroke-dasharray="0 340" stroke-linecap="round"/>
           <circle id="arc-ftp"    cx="70" cy="70" r="54" fill="none" stroke="#34d399" stroke-width="16" stroke-dasharray="0 340" stroke-linecap="round"/>
+          <circle id="arc-arp"    cx="70" cy="70" r="54" fill="none" stroke="#f472b6" stroke-width="16" stroke-dasharray="0 340" stroke-linecap="round"/>
+          <circle id="arc-wifi"   cx="70" cy="70" r="54" fill="none" stroke="#fb923c" stroke-width="16" stroke-dasharray="0 340" stroke-linecap="round"/>
+          <circle id="arc-shell"  cx="70" cy="70" r="54" fill="none" stroke="#a3e635" stroke-width="16" stroke-dasharray="0 340" stroke-linecap="round"/>
         </svg>
         <div class="donut-center">
           <div class="dc-val" id="dc-total">0</div>
@@ -328,35 +335,53 @@ footer{
         </div>
       </div>
       <div class="legend">
-        <div class="legend-item">
+        <div class="legend-item" data-ftype="0" onclick="setFilter(0)">
           <div class="legend-dot" style="background:#a78bfa"></div>
           <span class="lname">RTSP</span>
           <div class="lbar"><div class="lbar-fill" id="lb-rtsp" style="background:#a78bfa;width:0%"></div></div>
           <span class="lval" id="lv-rtsp">0</span>
         </div>
-        <div class="legend-item">
+        <div class="legend-item" data-ftype="1" onclick="setFilter(1)">
           <div class="legend-dot" style="background:#fbbf24"></div>
           <span class="lname">HTTP</span>
           <div class="lbar"><div class="lbar-fill" id="lb-http" style="background:#fbbf24;width:0%"></div></div>
           <span class="lval" id="lv-http">0</span>
         </div>
-        <div class="legend-item">
+        <div class="legend-item" data-ftype="2" onclick="setFilter(2)">
           <div class="legend-dot" style="background:#f87171"></div>
           <span class="lname">Telnet</span>
           <div class="lbar"><div class="lbar-fill" id="lb-telnet" style="background:#f87171;width:0%"></div></div>
           <span class="lval" id="lv-telnet">0</span>
         </div>
-        <div class="legend-item">
+        <div class="legend-item" data-ftype="3" onclick="setFilter(3)">
           <div class="legend-dot" style="background:#38bdf8"></div>
           <span class="lname">SSH</span>
           <div class="lbar"><div class="lbar-fill" id="lb-ssh" style="background:#38bdf8;width:0%"></div></div>
           <span class="lval" id="lv-ssh">0</span>
         </div>
-        <div class="legend-item">
+        <div class="legend-item" data-ftype="4" onclick="setFilter(4)">
           <div class="legend-dot" style="background:#34d399"></div>
           <span class="lname">FTP</span>
           <div class="lbar"><div class="lbar-fill" id="lb-ftp" style="background:#34d399;width:0%"></div></div>
           <span class="lval" id="lv-ftp">0</span>
+        </div>
+        <div class="legend-item" data-ftype="7" onclick="setFilter(7)">
+          <div class="legend-dot" style="background:#a3e635"></div>
+          <span class="lname">Shell</span>
+          <div class="lbar"><div class="lbar-fill" id="lb-shell" style="background:#a3e635;width:0%"></div></div>
+          <span class="lval" id="lv-shell">0</span>
+        </div>
+        <div class="legend-item" data-ftype="5" onclick="setFilter(5)">
+          <div class="legend-dot" style="background:#f472b6"></div>
+          <span class="lname">ARP / MITM</span>
+          <div class="lbar"><div class="lbar-fill" id="lb-arp" style="background:#f472b6;width:0%"></div></div>
+          <span class="lval" id="lv-arp">0</span>
+        </div>
+        <div class="legend-item" data-ftype="6" onclick="setFilter(6)">
+          <div class="legend-dot" style="background:#fb923c"></div>
+          <span class="lname">Wi-Fi deauth</span>
+          <div class="lbar"><div class="lbar-fill" id="lb-wifi" style="background:#fb923c;width:0%"></div></div>
+          <span class="lval" id="lv-wifi">0</span>
         </div>
       </div>
     </div>
@@ -510,27 +535,41 @@ function setVal(id,val){
   })(performance.now());
 }
 
-// donut chart
-function updateDonut(r,h,t,sh,f){
-  const tot=r+h+t+sh+f||1,gap=4;
-  function seg(id,v,off){
-    const len=Math.max(v/tot*(CIRC-gap*5),v>0?6:0);
-    const el=document.getElementById(id);
-    el.style.transition='stroke-dasharray .7s cubic-bezier(.4,0,.2,1),stroke-dashoffset .7s cubic-bezier(.4,0,.2,1)';
-    el.setAttribute('stroke-dasharray',`${len} ${CIRC}`);
-    el.setAttribute('stroke-dashoffset',-off);
-    return len;
-  }
-  const l1=seg('arc-rtsp',r,0),l2=seg('arc-http',h,l1+gap);
-  const l3=seg('arc-telnet',t,l1+l2+gap*2),l4=seg('arc-ssh',sh,l1+l2+l3+gap*3);
-  seg('arc-ftp',f,l1+l2+l3+l4+gap*4);
-  setVal('dc-total',r+h+t+sh+f);
-  ['rtsp','http','telnet','ssh','ftp'].forEach((k,i)=>{
-    const v=[r,h,t,sh,f][i];
-    document.getElementById('lb-'+k).style.width=Math.round(v/tot*100)+'%';
-    document.getElementById('lv-'+k).textContent=v;
+// donut chart — 8 attack types (index = attack_type_t)
+const DKEYS=['rtsp','http','telnet','ssh','ftp','arp','wifi','shell'];
+function updateDonut(vals){
+  vals=vals||[];const sum=vals.reduce((a,b)=>a+(b||0),0),tot=sum||1,gap=4,n=DKEYS.length;
+  let off=0;
+  DKEYS.forEach((k,i)=>{
+    const v=vals[i]||0,len=Math.max(v/tot*(CIRC-gap*n),v>0?6:0);
+    const el=document.getElementById('arc-'+k);
+    if(el){
+      el.style.transition='stroke-dasharray .7s cubic-bezier(.4,0,.2,1),stroke-dashoffset .7s cubic-bezier(.4,0,.2,1)';
+      el.setAttribute('stroke-dasharray',`${len} ${CIRC}`);
+      el.setAttribute('stroke-dashoffset',-off);
+    }
+    off+=len+gap;
+    const lb=document.getElementById('lb-'+k),lv=document.getElementById('lv-'+k);
+    if(lb)lb.style.width=Math.round(v/tot*100)+'%';
+    if(lv)lv.textContent=v;
   });
+  setVal('dc-total',sum);
 }
+
+// type filter (click a card or legend row)
+let _filter=null;
+const matchF=e=>_filter===null||e.type===_filter;
+function applyFilter(){
+  _seen.clear();
+  const feed=document.getElementById('feed');
+  feed.innerHTML='<div class="feed-empty">'+(_filter===null?'Waiting for attackers…':'No matching events…')+'</div>';
+  const fe=_entries.filter(matchF);
+  updateFeed(fe);updateTable(fe);
+  document.querySelectorAll('[data-ftype]').forEach(el=>
+    el.classList.toggle('flt-on',_filter!==null&&+el.getAttribute('data-ftype')===_filter));
+}
+function setFilter(t){_filter=(_filter===t?null:t);applyFilter();}
+window.setFilter=setFilter;
 
 // live feed
 const _seen=new Set();
@@ -590,13 +629,14 @@ setInterval(()=>{
 async function load(){
   try{
     const r=await fetch('/api/attacks');if(!r.ok)throw 0;
-    const d=await r.json(),bt=d.by_type||[0,0,0],en=d.entries||[];
+    const d=await r.json(),bt=d.by_type||[],en=d.entries||[];
     _entries=en;
     setVal('s-total',d.total||0);
     setVal('s-ips',new Set(en.map(e=>e.ip)).size);
     setVal('s-rtsp',bt[0]||0);setVal('s-http',bt[1]||0);setVal('s-telnet',bt[2]||0);setVal('s-ssh',bt[3]||0);setVal('s-ftp',bt[4]||0);
-    updateDonut(bt[0]||0,bt[1]||0,bt[2]||0,bt[3]||0,bt[4]||0);
-    updateFeed(en);updateTable(en);setOnline(true);
+    updateDonut(bt);
+    const fe=en.filter(matchF);
+    updateFeed(fe);updateTable(fe);setOnline(true);
   }catch{
     setOnline(false);
     document.getElementById('tbody').innerHTML='<tr class="empty-row"><td colspan="7" style="color:var(--red)">&#9888; Device unreachable</td></tr>';
@@ -626,12 +666,13 @@ function applyEntry(e){
   if(!_entries.some(x=>`${x.ts}-${x.ip}-${x.type}`===key)){
     _entries.unshift(e);if(_entries.length>50)_entries.pop();
   }
-  const bt=[0,0,0,0,0];_entries.forEach(x=>{if(x.type<5)bt[x.type]++;});
+  const bt=[0,0,0,0,0,0,0,0];_entries.forEach(x=>{if(x.type<8)bt[x.type]++;});
   setVal('s-total',(_prev['s-total']||0)+1);
   setVal('s-ips',new Set(_entries.map(x=>x.ip)).size);
   setVal('s-rtsp',bt[0]);setVal('s-http',bt[1]);setVal('s-telnet',bt[2]);setVal('s-ssh',bt[3]);setVal('s-ftp',bt[4]);
-  updateDonut(bt[0],bt[1],bt[2],bt[3],bt[4]);
-  updateFeed([e]);updateTable(_entries);setOnline(true);
+  updateDonut(bt);
+  if(matchF(e))updateFeed([e]);
+  updateTable(_entries.filter(matchF));setOnline(true);
 }
 function connectWS(){
   let ws;
