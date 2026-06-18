@@ -57,6 +57,17 @@ void wifi_manager_wait_for_ip(void);
 // Thread-safe (reads a volatile flag set by the event handler).
 bool wifi_manager_is_connected(void);
 
+// Monotonic count of ALL forced STA disconnects since boot. Thread-safe.
+uint32_t wifi_manager_disconnect_count(void);
+
+// Monotonic count of disconnects attributable to a received deauth/disassoc
+// frame, classified by the 802.11 reason code (low codes 1-9, excluding
+// assoc-leave) vs. benign RF losses (beacon-timeout / no-AP / handshake-timeout,
+// reason 200+). A single deauth-attributable drop is enough to grab a handshake,
+// so the Wi-Fi threat monitor alerts on the first one rather than on a storm.
+// Thread-safe (reads a volatile counter).
+uint32_t wifi_manager_deauth_disconnect_count(void);
+
 // Copy the current IPv4 address into buf (at least WIFI_IP_STR_LEN bytes).
 // Writes an empty string if not connected. Returns buf for convenience.
 char *wifi_manager_get_ip_str(char *buf, size_t len);

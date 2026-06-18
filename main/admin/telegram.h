@@ -44,6 +44,15 @@
 // Keeps the bot under Telegram's per-chat rate limit.
 #define TELEGRAM_RATE_LIMIT_MS    2000
 
+// Delivery resilience. A deauth / ARP attack can knock the device offline at
+// the very moment it needs to alert, so before each send the worker waits up to
+// TELEGRAM_RECONNECT_WAIT_MS for the link to recover, then retries the HTTPS
+// POST up to TELEGRAM_SEND_RETRIES times (TELEGRAM_RETRY_DELAY_MS apart). This
+// lets a notification survive the outage it is reporting.
+#define TELEGRAM_RECONNECT_WAIT_MS 15000
+#define TELEGRAM_SEND_RETRIES      3
+#define TELEGRAM_RETRY_DELAY_MS    3000
+
 // Enqueue an attack notification. Non-blocking — safe to call from any task/core.
 // Drops the entry silently if the queue is full.
 void telegram_notify(const attack_log_t *entry);

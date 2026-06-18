@@ -30,6 +30,9 @@ static esp_netif_t       *s_sta_netif   = NULL;
 static volatile bool      s_connected   = false;
 static bool               s_sntp_inited = false;
 static int                s_retry_count = 0;
+static volatile uint32_t  s_disconnect_count = 0;   // all forced STA disconnects
+static volatile uint32_t  s_deauth_disc_count = 0;  // disconnects attributable to a received deauth/disassoc
+static volatile uint8_t   s_last_disc_reason = 0;   // 802.11 reason of the most recent disconnect
 static char               s_ip_str[WIFI_IP_STR_LEN] = {0};
 #if MDNS_ENABLE
 static bool               s_mdns_inited = false;
@@ -102,15 +105,33 @@ static void on_wifi_event(void *arg, esp_event_base_t base,
             break;
 
         case WIFI_EVENT_STA_DISCONNECTED: {
+            const wifi_event_sta_disconnected_t *d =
+                (const wifi_event_sta_disconnected_t *)data;
+            uint8_t reason = d ? d->reason : 0;
+            s_last_disc_reason = reason;
             s_connected = false;
+            s_disconnect_count++;          // observed by the Wi-Fi threat monitor
+
+            // Tell a deauth/disassoc-induced drop apart from a benign RF drop by
+            // the 802.11 reason code. A deauth frame (even a single spoofed one,
+            // enough to force a reconnect and capture the 4-way handshake) carries
+            // a low reason code (1-9). Benign losses report 200+ (beacon timeout,
+            // no-AP-found, handshake-timeout); code 8 (assoc-leave) is the AP's own
+            // roaming/teardown. So one deauth-attributable drop is already a signal.
+            bool deauth_reason = (reason != 0 && reason < 200 &&
+                                  reason != WIFI_REASON_ASSOC_LEAVE);
+            if (deauth_reason) {
+                s_deauth_disc_count++;
+            }
+
             xEventGroupClearBits(s_wifi_eg, WIFI_GOT_IP_BIT);
             s_ip_str[0] = '\0';
 
             s_retry_count++;
-            if (s_retry_count == 1 ||
+            if (deauth_reason || s_retry_count == 1 ||
                 s_retry_count % WIFI_LOG_RETRY_INTERVAL == 0) {
-                ESP_LOGW(TAG, "Disconnected (attempt %d) — retrying in %d ms",
-                         s_retry_count, WIFI_RECONNECT_DELAY_MS);
+                ESP_LOGW(TAG, "Disconnected reason=%u (attempt %d) — retrying in %d ms",
+                         reason, s_retry_count, WIFI_RECONNECT_DELAY_MS);
             }
 
             // Brief delay prevents a tight connect/fail/connect loop that
@@ -209,6 +230,16 @@ void wifi_manager_wait_for_ip(void)
 bool wifi_manager_is_connected(void)
 {
     return s_connected;
+}
+
+uint32_t wifi_manager_disconnect_count(void)
+{
+    return s_disconnect_count;
+}
+
+uint32_t wifi_manager_deauth_disconnect_count(void)
+{
+    return s_deauth_disc_count;
 }
 
 char *wifi_manager_get_ip_str(char *buf, size_t len)

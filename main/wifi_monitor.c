@@ -20,14 +20,26 @@
 #define WIFI_MON_WINDOW_MS          2000    // evaluation window
 #endif
 #ifndef WIFI_MON_DEAUTH_THRESHOLD
-// deauth+disassoc frames per window that count as a flood. Kept low on purpose:
-// a deauth attack knocks THIS station off the air, so it only sniffs a partial
-// burst (~5-10 frames) before it loses the channel to reconnect. Normal traffic
-// shows 0-1 disassoc per window, so 5 separates attack from noise with margin.
-#define WIFI_MON_DEAUTH_THRESHOLD   5
+// BROADCAST deauth/disassoc frames within the rolling window that count as a
+// flood. Only broadcast frames are counted (see promisc_cb), so a legitimate
+// router's unicast roaming/band-steering deauth never contributes — measured
+// broadcast baseline on a real network is ~0. A deauth attack knocks THIS
+// station off-channel, so it only catches a partial burst; 5 over the rolling
+// window reliably fires while staying clear of the (near-zero) broadcast noise.
+#define WIFI_MON_DEAUTH_THRESHOLD   3
 #endif
 #ifndef WIFI_MON_ROLL_WINDOWS
 #define WIFI_MON_ROLL_WINDOWS       5       // windows summed (×WINDOW_MS = span)
+#endif
+#ifndef WIFI_MON_DEAUTH_DISC_THRESHOLD
+// Deauth-attributable STA disconnects within the rolling span that signal an
+// attack targeting THIS device. This is the reliable detector: a deauth knocks
+// us off-channel (so passive sniffing sees almost nothing), but we always observe
+// our own disconnect — and wifi_manager classifies it by 802.11 reason code, so
+// benign RF drops (beacon-timeout / no-AP, reason 200+) are NOT counted. A single
+// spoofed deauth is enough to force a reconnect and capture the handshake, so the
+// default threshold is 1: we alert on the first deauth-attributable drop.
+#define WIFI_MON_DEAUTH_DISC_THRESHOLD 1
 #endif
 #ifndef WIFI_MON_COOLDOWN_S
 #define WIFI_MON_COOLDOWN_S         60      // min seconds between flood alerts
@@ -42,7 +54,7 @@ static const char *TAG = "WIFI-MON";
 // Counters shared between the promiscuous RX callback (Wi-Fi task) and the
 // evaluation task. Guarded by a spinlock — the callback must stay tiny.
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
-static uint32_t s_count;          // deauth+disassoc frames in the current window
+static uint32_t s_count;          // BROADCAST deauth/disassoc frames this window
 static uint8_t  s_src[6];         // transmitter MAC of the most recent frame
 static uint8_t  s_bssid[6];       // BSSID (addr3) of the most recent frame
 
@@ -58,32 +70,32 @@ static void promisc_cb(void *buf, wifi_promiscuous_pkt_type_t type)
     uint8_t subtype = (fc0 >> 4) & 0xF;
     if (subtype != SUBTYPE_DEAUTH && subtype != SUBTYPE_DISASSOC) return;
 
+    // Count only BROADCAST deauth/disassoc (addr1 == ff:ff:ff:ff:ff:ff) — the
+    // "kick everyone off the AP" flood that aireplay-ng / ESP deauthers send.
+    // A normal router's roaming / band-steering deauth is unicast to a specific
+    // client, so this rejects the routine deauth a legit AP constantly emits.
+    if ((f[4] & f[5] & f[6] & f[7] & f[8] & f[9]) != 0xFF) return;
+
     portENTER_CRITICAL(&s_mux);
     s_count++;
-    memcpy(s_src,   f + 10, 6);                 // addr2 = transmitter
+    memcpy(s_src,   f + 10, 6);                 // addr2 = transmitter (spoofed AP)
     memcpy(s_bssid, f + 16, 6);                 // addr3 = BSSID
     portEXIT_CRITICAL(&s_mux);
 }
 
 // ── Alert (same pipeline the honeypots use) ─────────────────────────────────────
-static void raise_flood_alert(uint32_t count, const uint8_t src[6], const uint8_t bssid[6])
+// src may be all-zero when the attacker MAC is unknown (we were the victim).
+static void raise_wifi_alert(const uint8_t src[6], const char *detail)
 {
-    char src_s[WIFI_MAC_STR_LEN], bssid_s[WIFI_MAC_STR_LEN];
-    wifi_manager_format_mac(src,   src_s,   sizeof(src_s));
-    wifi_manager_format_mac(bssid, bssid_s, sizeof(bssid_s));
-
     attack_log_t e = {
         .type      = ATTACK_WIFI,
         .src_ip    = 0,                          // radio-layer event — no IP
         .timestamp = (uint32_t)time(NULL),
     };
     memcpy(e.src_mac, src, 6);
-    snprintf(e.payload, sizeof(e.payload),
-             "Deauth flood: %lu frames/%dms from %s -> BSSID %s",
-             (unsigned long)count, WIFI_MON_ROLL_WINDOWS * WIFI_MON_WINDOW_MS,
-             src_s, bssid_s);
+    strlcpy(e.payload, detail, sizeof(e.payload));
 
-    ESP_LOGW(TAG, "%s", e.payload);
+    ESP_LOGW(TAG, "%s", detail);
     log_store_append(&e);
     telegram_notify(&e);
 }
@@ -108,37 +120,69 @@ void wifi_monitor_task(void *arg)
     ESP_LOGI(TAG, "Wi-Fi threat monitor running (deauth flood >= %d / %dms)",
              WIFI_MON_DEAUTH_THRESHOLD, WIFI_MON_ROLL_WINDOWS * WIFI_MON_WINDOW_MS);
 
-    time_t last_alert = 0;
-    // Rolling sum over the last ROLL windows. A deauth attack knocks this
-    // station off-channel, so it only sniffs the flood in sporadic bursts —
-    // summing several windows catches it where a single window would miss.
-    uint32_t ring[WIFI_MON_ROLL_WINDOWS] = {0};
-    int ri = 0;
+    const int    span_ms = WIFI_MON_ROLL_WINDOWS * WIFI_MON_WINDOW_MS;
+    time_t       last_alert = 0;
+    // Rolling sums over the last ROLL windows for two independent signals.
+    uint32_t bring[WIFI_MON_ROLL_WINDOWS] = {0};   // broadcast deauth frames sniffed
+    uint32_t dring[WIFI_MON_ROLL_WINDOWS] = {0};   // deauth-attributable self-disconnects
+    int      ri = 0;
+    uint32_t prev_disc = wifi_manager_deauth_disconnect_count();
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(WIFI_MON_WINDOW_MS));
 
+        // Signal 1 — broadcast deauth/disassoc frames sniffed this window.
         uint32_t count;
         uint8_t  src[6], bssid[6];
         portENTER_CRITICAL(&s_mux);
         count = s_count;
         memcpy(src, s_src, 6);
         memcpy(bssid, s_bssid, 6);
-        s_count = 0;                             // reset window
+        s_count = 0;
         portEXIT_CRITICAL(&s_mux);
 
-        ring[ri] = count;
-        ri = (ri + 1) % WIFI_MON_ROLL_WINDOWS;
-        uint32_t sum = 0;
-        for (int i = 0; i < WIFI_MON_ROLL_WINDOWS; i++) sum += ring[i];
+        // Signal 2 — deauth-attributable disconnects this window (reliable when
+        // we're the target; benign RF drops are excluded by reason-code in
+        // wifi_manager). One is enough to capture a handshake, so threshold = 1.
+        uint32_t dc = wifi_manager_deauth_disconnect_count();
+        uint32_t dd = dc - prev_disc;
+        prev_disc = dc;
 
-        if (sum >= WIFI_MON_DEAUTH_THRESHOLD) {
-            time_t now = time(NULL);
-            if (now - last_alert >= WIFI_MON_COOLDOWN_S) {
-                last_alert = now;
-                raise_flood_alert(sum, src, bssid);
-            }
-            memset(ring, 0, sizeof(ring));       // avoid immediate re-trigger
+        bring[ri] = count;
+        dring[ri] = dd;
+        ri = (ri + 1) % WIFI_MON_ROLL_WINDOWS;
+        uint32_t bsum = 0, dsum = 0;
+        for (int i = 0; i < WIFI_MON_ROLL_WINDOWS; i++) { bsum += bring[i]; dsum += dring[i]; }
+
+        time_t now = time(NULL);
+        if (now - last_alert < WIFI_MON_COOLDOWN_S) continue;
+
+        if (dsum >= WIFI_MON_DEAUTH_DISC_THRESHOLD) {
+            // Deauthed off the network — the strong signal. reason-code classified
+            // in wifi_manager, so this is a forced drop, not a benign RF loss. Even
+            // a single one can mean a handshake was just captured.
+            char detail[128];
+            snprintf(detail, sizeof(detail),
+                     "Deauth attack: %lu forced disconnect%s in %dms "
+                     "(station knocked off-air — handshake capture likely)",
+                     (unsigned long)dsum, dsum == 1 ? "" : "s", span_ms);
+            uint8_t unknown[6] = {0};            // attacker MAC not observable here
+            raise_wifi_alert(unknown, detail);
+            last_alert = now;
+            memset(bring, 0, sizeof(bring));
+            memset(dring, 0, sizeof(dring));
+        } else if (bsum >= WIFI_MON_DEAUTH_THRESHOLD) {
+            // Sniffed a broadcast deauth flood (e.g. an attack aimed elsewhere).
+            char src_s[WIFI_MAC_STR_LEN], bssid_s[WIFI_MAC_STR_LEN], detail[160];
+            wifi_manager_format_mac(src,   src_s,   sizeof(src_s));
+            wifi_manager_format_mac(bssid, bssid_s, sizeof(bssid_s));
+            snprintf(detail, sizeof(detail),
+                     "Broadcast deauth flood: %lu frames/%dms from %s -> BSSID %s",
+                     (unsigned long)bsum, span_ms, src_s, bssid_s);
+            raise_wifi_alert(src, detail);
+            last_alert = now;
+            memset(bring, 0, sizeof(bring));
+            memset(dring, 0, sizeof(dring));
         }
     }
 #endif  // WIFI_MON_ENABLE

@@ -153,20 +153,31 @@
 
 // ── Wi-Fi threat monitor (radio-layer) ──────────────────────────────────────────
 //
-// Uses promiscuous mode to detect 802.11 deauthentication / disassociation
-// floods on the channel the device is associated to — Wi-Fi DoS attacks that a
-// TCP-stack honeypot can never see. A burst above the threshold within the
-// window raises an ATTACK_WIFI event with the attacker's transmitter MAC.
-// Works while the device stays connected (no channel hopping). All values
-// optional — wifi_monitor.c falls back to these defaults.
-#define WIFI_MON_ENABLE             1       // 0 = disable the monitor task
-#define WIFI_MON_WINDOW_MS          2000    // tick length
-#define WIFI_MON_ROLL_WINDOWS       5       // windows summed → ~10s detection span
-// Kept low: a deauth attack knocks this station off the channel, so it only
-// sniffs the flood in sporadic bursts. Summing ~10s of windows catches it;
-// normal traffic is 0-1 disassoc per window, so 5 separates attack from noise.
-#define WIFI_MON_DEAUTH_THRESHOLD   5       // deauth+disassoc within the rolling span
-#define WIFI_MON_COOLDOWN_S         60      // min seconds between flood alerts
+// Detects 802.11 deauthentication / disassociation attacks — including the
+// single-frame deauth used to force a reconnect and capture a WPA2 handshake —
+// that a TCP-stack honeypot can never see. Two independent signals:
+//
+//   1. Forced disconnects (primary). A deauth knocks THIS station off-air, so
+//      we always observe our own disconnect. wifi_manager classifies each by its
+//      802.11 reason code: a deauth-induced drop carries a low code (1-9) while
+//      a benign RF loss reports 200+ (beacon-timeout / no-AP / handshake-timeout)
+//      and is ignored. One deauth-attributable drop is enough to grab a handshake,
+//      so the default threshold is 1 — no false positives from a flaky link.
+//   2. Broadcast deauth flood (secondary). Promiscuous mode counts broadcast
+//      deauth/disassoc frames sniffed on-channel (e.g. an attack aimed elsewhere).
+//
+// Either signal raises an ATTACK_WIFI event. All values optional — wifi_monitor.c
+// falls back to these defaults.
+#define WIFI_MON_ENABLE                1     // 0 = disable the monitor task
+#define WIFI_MON_WINDOW_MS             2000  // tick length
+#define WIFI_MON_ROLL_WINDOWS          5     // windows summed → ~10s detection span
+#define WIFI_MON_DEAUTH_DISC_THRESHOLD 1     // deauth-attributable disconnects → alert
+// Secondary broadcast-sniff threshold. A deauth attack knocks this station off
+// the channel, so it only sniffs the flood in sporadic bursts; summing ~10s of
+// windows catches a flood aimed elsewhere without firing on the near-zero
+// broadcast-deauth baseline of a normal network.
+#define WIFI_MON_DEAUTH_THRESHOLD      3     // broadcast deauth/disassoc within the span
+#define WIFI_MON_COOLDOWN_S            60    // min seconds between Wi-Fi alerts
 
 // ── Compile-time validation ───────────────────────────────────────────────────
 //

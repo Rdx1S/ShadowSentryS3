@@ -112,10 +112,10 @@ done:
 
 // ── HTTPS sender ──────────────────────────────────────────────────────────────
 
-// Sends html_text to the configured Telegram chat.
-// html_text may contain Telegram-supported HTML tags (<b>, <code>, etc.)
-// and actual Unicode — but NOT raw double-quotes or backslashes.
-static void send_message(const char *html_text)
+// Sends html_text to the configured Telegram chat. Returns true only on a
+// confirmed HTTP 200. html_text may contain Telegram-supported HTML tags
+// (<b>, <code>, etc.) and actual Unicode — but NOT raw double-quotes or backslashes.
+static bool send_message(const char *html_text)
 {
     char url[128];
     snprintf(url, sizeof(url),
@@ -142,12 +142,13 @@ static void send_message(const char *html_text)
     esp_http_client_handle_t client = esp_http_client_init(&cfg);
     if (!client) {
         ESP_LOGE(TAG, "Failed to init HTTP client");
-        return;
+        return false;
     }
 
     esp_http_client_set_header(client, "Content-Type", "application/json");
     esp_http_client_set_post_field(client, body, body_len);
 
+    bool ok = false;
     esp_err_t err = esp_http_client_perform(client);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Send failed: %s", esp_err_to_name(err));
@@ -157,11 +158,14 @@ static void send_message(const char *html_text)
             ESP_LOGW(TAG, "Rate limited by Telegram (HTTP 429) — increase TELEGRAM_RATE_LIMIT_MS");
         else if (status != 200)
             ESP_LOGW(TAG, "Unexpected HTTP %d from Telegram", status);
-        else
+        else {
             ESP_LOGI(TAG, "Alert sent OK");
+            ok = true;
+        }
     }
 
     esp_http_client_cleanup(client);
+    return ok;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -315,6 +319,25 @@ void telegram_task(void *arg)
         ESP_LOGD(TAG, "Sending alert for %s (%s)", ip_str,
                  s_type_label[entry.type]);
 
-        send_message(msg);
+        // A deauth / ARP attack often knocks us offline at the very moment we
+        // need to alert. Wait for the link to recover, then retry, so the
+        // notification survives the outage it is reporting.
+        for (int attempt = 1; attempt <= TELEGRAM_SEND_RETRIES; attempt++) {
+            int waited = 0;
+            while (!wifi_manager_is_connected() &&
+                   waited < TELEGRAM_RECONNECT_WAIT_MS) {
+                vTaskDelay(pdMS_TO_TICKS(500));
+                waited += 500;
+            }
+            if (send_message(msg)) break;
+            if (attempt < TELEGRAM_SEND_RETRIES) {
+                ESP_LOGW(TAG, "Alert send attempt %d/%d failed — retrying in %dms",
+                         attempt, TELEGRAM_SEND_RETRIES, TELEGRAM_RETRY_DELAY_MS);
+                vTaskDelay(pdMS_TO_TICKS(TELEGRAM_RETRY_DELAY_MS));
+            } else {
+                ESP_LOGE(TAG, "Alert delivery failed after %d attempts",
+                         TELEGRAM_SEND_RETRIES);
+            }
+        }
     }
 }
