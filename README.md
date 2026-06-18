@@ -47,12 +47,12 @@ Attacker / bot
 | RTSP | Username + Password | `admin:12345` from the Basic Auth header |
 | HTTP | Username + Password + **path + User-Agent** | NVR login POST form; every request (GET/POST/other) is fingerprinted by path and the scanner's User-Agent |
 | Telnet | Username + Password **+ post-login commands** | Login prompt, then a fake interactive shell that logs every command |
-| SSH | Client version string | `SSH-2.0-OpenSSH_7.4p1 Debian-10` |
+| SSH | Username + Password **+ post-login commands** | Real SSH-2.0 server (wolfSSH) — `root:hunter2`, then the interactive shell |
 | FTP | Username + Password | `USER admin` / `PASS password` (RFC 959) |
 
-> SSH does not capture credentials — after the banner exchange all traffic is encrypted. The version string is still a useful attacker fingerprint.
+> **Real SSH server (wolfSSH).** Port 22 is a genuine SSH-2.0 server, not a banner: wolfSSH performs the full key exchange (curve25519) and presents an ECDSA host key, so the device terminates the crypto and **captures the plaintext username and password** the attacker submits — something a banner-only trap can't do. The login is then accepted (any password; it's a decoy) and the attacker lands in the same interactive fake shell as Telnet, with every command logged. One caveat: wolfSSH advertises its own version string, so a fingerprinting client can tell it isn't OpenSSH — the value here is credential + command capture, not banner mimicry.
 
-> **Interactive fake shell (Cowrie-style).** Instead of endlessly replying "Login incorrect", the Telnet honeypot *accepts* the login and drops the attacker into a believable Ubuntu 20.04 shell that answers common recon commands (`ls`, `cat /etc/passwd`, `uname -a`, `ps`, `ifconfig`, `wget`, …) while **logging every command they type** as a `Shell` event. Capturing the post-login command set reveals attacker TTPs and IOCs — which payloads they fetch, which binaries they try to run — that a credential-only honeypot never sees. Download/exec commands (`wget`/`curl`/`tftp`/`chmod +x`/`./…`) are flagged and escalated to a Telegram alert. Nothing is ever executed: responses are canned, the filesystem is fictional, and downloads are faked. Tunable via `TELNET_SHELL_ENABLE` / `TELNET_LOGIN_GRANT_ATTEMPT` in `config.h`.
+> **Interactive fake shell (Cowrie-style).** Instead of endlessly replying "Login incorrect", the Telnet and SSH honeypots *accept* the login and drop the attacker into a believable Ubuntu 20.04 shell that answers common recon commands (`ls`, `cat /etc/passwd`, `uname -a`, `ps`, `ifconfig`, `wget`, …) while **logging every command they type** as a `Shell` event. Capturing the post-login command set reveals attacker TTPs and IOCs — which payloads they fetch, which binaries they try to run — that a credential-only honeypot never sees. Download/exec commands (`wget`/`curl`/`tftp`/`chmod +x`/`./…`) are flagged and escalated to a Telegram alert. Nothing is ever executed: responses are canned, the filesystem is fictional, and downloads are faked. Tunable via `TELNET_SHELL_ENABLE` / `TELNET_LOGIN_GRANT_ATTEMPT` in `config.h`.
 
 > **MAC address for every protocol.** Since the attacker is on the same local network, for each event ShadowSentry resolves their MAC via the lwIP ARP table and shows it together with a best-effort vendor guess (OUI). A randomized MAC (private, typical for smartphones) is flagged separately. The MAC is shown both in the dashboard and in the Telegram alert.
 
@@ -258,7 +258,8 @@ ShadowSentryS3/
     │   ├── http_trap.c/h       Port 80, Fake NVR login page
     │   ├── telnet_trap.c/h     Port 23, Fake Ubuntu 20.04 login
     │   ├── fake_shell.c/h      Interactive post-login shell (command capture)
-    │   ├── ssh_trap.c/h        Port 22, Fake OpenSSH, client fingerprint
+    │   ├── ssh_trap.c/h        Port 22, Real SSH server (wolfSSH) — captures creds
+    │   ├── ssh_hostkey.h       Embedded ECDSA host key (decoy)
     │   └── ftp_trap.c/h        Port 21, Fake vsFTPd 3.0.5, full creds
     ├── admin/                  ── Core 1 — Admin World ───────────────
     │   ├── admin_panel.c/h     Port 9999, HTTP Basic Auth, REST API

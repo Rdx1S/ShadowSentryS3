@@ -437,7 +437,7 @@ const ICON=['&#128249;','&#128760;','&#128187;','&#128273;','&#128193;','&#12837
 const CIRC=2*Math.PI*54;
 const TNAME=['RTSP','HTTP','Telnet','SSH','FTP','ARP spoof','WiFi deauth','Shell session'];
 const TPORT=[554,80,23,22,21,'—','—',23];
-const TDESC=['Fake Hikvision camera','Fake NVR login page','Fake Ubuntu 20.04','OpenSSH fingerprint','Fake vsFTPd 3.0.5','MITM / ARP cache poisoning','802.11 deauth/disassoc flood','Interactive fake shell — commands captured'];
+const TDESC=['Fake Hikvision camera','Fake NVR login page','Fake Ubuntu 20.04','Real SSH server — login captured','Fake vsFTPd 3.0.5','MITM / ARP cache poisoning','802.11 deauth/disassoc flood','Interactive fake shell — commands captured'];
 // ISO country code -> flag emoji (two regional-indicator code points)
 const flagOf=c=>(c&&c.length===2&&/^[A-Za-z]{2}$/.test(c))
   ?String.fromCodePoint(...[...c.toUpperCase()].map(x=>0x1F1E6+x.charCodeAt(0)-65)):'';

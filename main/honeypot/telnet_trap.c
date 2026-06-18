@@ -10,9 +10,33 @@
 #include "lwip/inet.h"
 #include "esp_log.h"
 #include <string.h>
+#include <stdint.h>
 #include <time.h>
 
 static const char *TAG = "TELNET";
+
+// ── Fake-shell transport (plaintext socket) ─────────────────────────────────────
+// The socket fd is carried in shell_io_t.io as an integer cast to void*.
+
+static int tnet_read_byte(void *io)
+{
+    int sock = (int)(intptr_t)io;
+    unsigned char c;
+    for (;;) {
+        if (recv(sock, &c, 1, 0) <= 0) return -1;
+        if (c == 0xFF) {                 // telnet IAC: skip the 2 option bytes
+            char opt[2];
+            if (recv(sock, opt, 2, 0) <= 0) return -1;
+            continue;
+        }
+        return c;
+    }
+}
+
+static int tnet_write(void *io, const char *buf, int len)
+{
+    return send((int)(intptr_t)io, buf, len, 0);
+}
 
 // Mimics Ubuntu 20.04 login prompt
 static const char BANNER[] =
@@ -102,7 +126,13 @@ static void handle_client(int sock, struct sockaddr_in *addr)
         // "succeeds" and the attacker drops into the fake interactive shell,
         // where every command is captured. Closes the connection afterwards.
         if (TELNET_SHELL_ENABLE && attempts >= TELNET_LOGIN_GRANT_ATTEMPT) {
-            fake_shell_run(sock, addr, user[0] ? user : "root");
+            shell_io_t io = {
+                .io        = (void *)(intptr_t)sock,
+                .read_byte = tnet_read_byte,
+                .write     = tnet_write,
+                .echo      = false,          // telnet client echoes locally
+            };
+            fake_shell_run(&io, addr, user[0] ? user : "root");
             return;
         }
 

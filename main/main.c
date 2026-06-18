@@ -39,8 +39,10 @@ static const char *TAG = "MAIN";
 //           plus libc snprintf / ESP_LOG formatting + lwIP send underneath.
 //           → 8192 gives comfortable headroom (4096 overflowed the canary)
 //
-//  ssh    : line[256] + attack_log_t(240) + overhead (~1200)
-//           → 3072 gives ~1.4 KB headroom
+//  ssh    : real wolfSSH server — the SSH-2.0 handshake (curve25519 ECDH +
+//           ECDSA host-key sign) and per-session crypto state are stack-heavy,
+//           then it hands off to the same interactive fake shell as Telnet.
+//           → 16384 (4096 nowhere near enough for the key exchange)
 //
 //  ftp    : line[256] + user[32] + pass[64] + attack_log_t(240) + overhead (~1200)
 //           → 3072 gives ~1.3 KB headroom
@@ -57,7 +59,7 @@ static const char *TAG = "MAIN";
 #define STACK_RTSP      6144
 #define STACK_HTTP      5120
 #define STACK_TELNET    8192
-#define STACK_SSH       3072
+#define STACK_SSH       16384
 #define STACK_FTP       3072
 #define STACK_TELEGRAM  8192
 #define STACK_ADMIN     8192

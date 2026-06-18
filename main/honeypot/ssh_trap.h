@@ -2,35 +2,38 @@
 #include <stdint.h>
 
 /*
- * SSH Honeypot — Port 22
+ * SSH Honeypot — Port 22  (real SSH server via wolfSSH)
  *
- * Impersonates OpenSSH 8.9p1 on Ubuntu 22.04. Captures the attacker's
- * SSH client software version string from the mandatory plaintext banner
- * exchange that begins every SSH-2.0 connection. This fingerprint
- * (e.g. "SSH-2.0-libssh_0.9.6", "SSH-2.0-Go", "SSH-2.0-Mirai") is
- * stored in attack_log_t.payload and forwarded to Telegram.
- *
- * Why no credentials?
- *   SSH v2 encrypts all traffic — including usernames and passwords —
- *   after the key exchange. A full key-exchange + AES-CTR stack is
- *   prohibitively heavy for an embedded honeypot. The version fingerprint
- *   alone identifies the scanning software and provides actionable threat
- *   intel: any connection to port 22 on this device is 100% anomalous.
+ * A genuine SSH-2.0 server: wolfSSH performs the full key exchange (curve25519),
+ * presents an ECDSA host key, and decrypts the authentication exchange. Because
+ * the server terminates the crypto, it captures the plaintext USERNAME and
+ * PASSWORD — something a banner-only trap can never do — then "accepts" the login
+ * (any password works; it's a decoy) and drops the attacker into the same
+ * interactive fake shell as Telnet (see fake_shell.c), logging every command.
  *
  * Attack flow:
- *   1. Scanner connects to port 22
- *   2. Device sends "SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.6\r\n"
- *   3. Client replies with its own version banner (plaintext, per RFC 4253 §4.2)
- *   4. Device logs the client fingerprint + source IP and closes
+ *   1. Scanner / brute-forcer connects to port 22
+ *   2. wolfSSH completes the SSH-2.0 handshake (ECDH + ECDSA host key)
+ *   3. Client sends username + password → captured in the user-auth callback
+ *      (logged as ATTACK_SSH with credentials + Telegram alert)
+ *   4. Login is accepted; the attacker lands in the fake Ubuntu shell
+ *   5. Every command is logged as ATTACK_SHELL (post-login TTPs / IOCs)
  *
- * Designed to run pinned to Core 0 (Hacker World).
+ * Note: wolfSSH advertises its own SSH version string in the banner, so a
+ * fingerprinting client can tell this is wolfSSH rather than OpenSSH. The value
+ * is the credential + command capture, not banner mimicry.
+ *
+ * Designed to run pinned to Core 0 (Hacker World). Needs a large stack for the
+ * handshake crypto — see STACK_SSH in main.c.
  */
 
 // Maximum queued TCP connections on port 22.
 #define SSH_BACKLOG         4
 
-// Per-connection receive timeout in seconds.
-#define SSH_RECV_TIMEOUT_S  10
+// Per-connection receive timeout in seconds. Covers each handshake round-trip
+// and bounds an idle interactive session so one stalled attacker can't pin the
+// single SSH task indefinitely.
+#define SSH_RECV_TIMEOUT_S  30
 
 // FreeRTOS task entry point. Pass NULL as arg.
 // Pin to Core 0 with xTaskCreatePinnedToCore().

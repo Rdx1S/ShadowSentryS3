@@ -336,14 +336,17 @@ void telegram_task(void *arg)
                 mac_line,
                 pay_h);
         } else if (entry.type == ATTACK_SSH) {
-            // SSH: no credentials (auth is encrypted); show client fingerprint only
+            // Real wolfSSH server now decrypts the auth exchange, so SSH captures
+            // the username + password like the other credential traps.
             snprintf(msg, sizeof(msg),
                 EMOJI_ALERT " <b>ShadowSentry S3 Alert</b>\n\n"
-                EMOJI_SSH   " Attack: <b>SSH</b>\n"
+                EMOJI_SSH   " Attack: <b>SSH login</b>\n"
                 EMOJI_IP    " IP: <code>%s</code>\n"
+                EMOJI_CREDS " Creds: <code>%s:%s</code>\n"
                 "%s\n"
                 EMOJI_LOG   " <code>%.200s</code>",
                 ip_str,
+                user_h, pass_h,
                 mac_line,
                 pay_h);
         } else {

@@ -1,29 +1,35 @@
 #pragma once
 #include <stdint.h>
+#include <stdbool.h>
 
 struct sockaddr_in;   // forward decl — avoid pulling lwip/sockets.h into the header
 
 /*
- * Fake interactive shell — Telnet post-login (Cowrie-style)
+ * Fake interactive shell — Telnet & SSH post-login (Cowrie-style)
  *
- * After the Telnet honeypot "accepts" a login it hands the connection here.
- * Instead of the usual "Login incorrect" loop, the attacker drops into a
- * believable Ubuntu 20.04 shell that answers common reconnaissance commands
- * (ls, cat /etc/passwd, uname -a, ps, ifconfig, wget, ...) while logging
- * EVERY command they type. Capturing the post-login command set is the whole
- * point: it reveals attacker TTPs and IOCs (which payloads they fetch, which
- * binaries they try to run) that a credential-only honeypot never sees.
+ * Once a honeypot "accepts" a login it hands the connection here. Instead of the
+ * usual "Login incorrect" loop, the attacker drops into a believable Ubuntu 20.04
+ * shell that answers common reconnaissance commands (ls, cat /etc/passwd,
+ * uname -a, ps, ifconfig, wget, ...) while logging EVERY command they type.
+ * Capturing the post-login command set is the whole point: it reveals attacker
+ * TTPs and IOCs (which payloads they fetch, which binaries they try to run) that
+ * a credential-only honeypot never sees.
  *
  * Nothing is ever executed. Responses are canned, the filesystem is fictional,
  * and downloads are faked — the box is a decoy, not a sandbox.
+ *
+ * Transport-agnostic: the emulator talks through a shell_io_t so the same shell
+ * drives both the plaintext Telnet socket and the encrypted wolfSSH channel. The
+ * Telnet client does its own local echo and line editing; an SSH PTY is in raw
+ * mode, so the SSH transport sets echo=true and the reader echoes input back.
  *
  * Logging:
  *   - session open               → ATTACK_SHELL event + Telegram alert
  *   - every command              → ATTACK_SHELL event (dashboard transcript)
  *   - download / exec IOC command → additional Telegram alert (wget/curl/tftp/…)
  *
- * Runs inline on the Telnet trap task (Core 0). Returns when the attacker logs
- * out, the per-session command cap is hit, or the socket closes.
+ * Returns when the attacker logs out, the per-session command cap is hit, or the
+ * transport closes.
  */
 
 // Hard cap on commands handled per session — bounds log volume and run time
@@ -37,8 +43,18 @@ struct sockaddr_in;   // forward decl — avoid pulling lwip/sockets.h into the 
 #define FAKE_SHELL_CMD_MAXLEN     256
 #endif
 
-// Run the fake shell over an already-"authenticated" Telnet socket.
-//   sock — connected client socket (a recv timeout should already be set)
+// Transport abstraction. The Telnet trap backs this with a raw socket; the SSH
+// trap backs it with a wolfSSH channel. read_byte returns one byte (0-255) or a
+// negative value on close/timeout; write returns bytes written (<0 on error).
+typedef struct {
+    void *io;                                       // opaque transport handle
+    int (*read_byte)(void *io);                     // one byte, or <0 on close/timeout
+    int (*write)(void *io, const char *buf, int len);
+    bool echo;                                      // server echoes input (SSH: true)
+} shell_io_t;
+
+// Run the fake shell over an already-"authenticated" transport.
+//   io   — transport callbacks (see shell_io_t)
 //   addr — client address, for logging + MAC/geo enrichment
 //   user — the username the attacker logged in as (drives prompt + whoami)
-void fake_shell_run(int sock, struct sockaddr_in *addr, const char *user);
+void fake_shell_run(const shell_io_t *io, struct sockaddr_in *addr, const char *user);
