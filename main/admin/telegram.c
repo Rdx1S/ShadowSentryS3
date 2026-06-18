@@ -32,6 +32,7 @@ static char s_boot_ip[INET_ADDRSTRLEN];
 #define EMOJI_MAC    "\xF0\x9F\x94\x97"   // 🔗
 #define EMOJI_ARP    "\xF0\x9F\x95\xB8"   // 🕸  (U+1F578 — spoof / MITM web)
 #define EMOJI_GEO    "\xF0\x9F\x93\x8D"   // 📍 (U+1F4CD — geolocation)
+#define EMOJI_WIFI   "\xF0\x9F\x93\xA1"   // 📡 (U+1F4E1 — radio-layer attack)
 
 // Convert a 2-letter ISO country code into its flag emoji (two regional-
 // indicator code points, 8 UTF-8 bytes + NUL). Writes "" for an invalid code.
@@ -51,8 +52,8 @@ static void cc_flag(const char *cc, char *out)
     out[o] = '\0';
 }
 
-static const char *s_type_label[] = {"RTSP", "HTTP", "Telnet", "SSH", "FTP", "ARP"};
-static const char *s_type_emoji[] = {EMOJI_RTSP, EMOJI_HTTP, EMOJI_TELNET, EMOJI_SSH, EMOJI_FTP, EMOJI_ARP};
+static const char *s_type_label[] = {"RTSP", "HTTP", "Telnet", "SSH", "FTP", "ARP", "WiFi"};
+static const char *s_type_emoji[] = {EMOJI_RTSP, EMOJI_HTTP, EMOJI_TELNET, EMOJI_SSH, EMOJI_FTP, EMOJI_ARP, EMOJI_WIFI};
 
 // ── String escaping helpers ───────────────────────────────────────────────────
 
@@ -262,7 +263,17 @@ void telegram_task(void *arg)
         }
 
         char msg[768];
-        if (entry.type == ATTACK_ARP) {
+        if (entry.type == ATTACK_WIFI) {
+            // Radio-layer attack (deauth/disassoc flood): no IP, no creds. The
+            // attacker's transmitter MAC is in mac_line; payload has the details.
+            snprintf(msg, sizeof(msg),
+                EMOJI_ALERT " <b>ShadowSentry S3 Alert</b>\n\n"
+                EMOJI_WIFI  " Attack: <b>Wi-Fi deauth flood</b>\n"
+                "%s\n"
+                EMOJI_LOG   " <code>%.200s</code>",
+                mac_line,
+                pay_h);
+        } else if (entry.type == ATTACK_ARP) {
             // ARP / MITM: network-level event, no credentials. The payload holds
             // the description (e.g. "Gateway 192.168.1.1 MAC changed ...").
             snprintf(msg, sizeof(msg),

@@ -25,6 +25,7 @@ idf_component_register(
         "wifi_manager.c"
         "arp_monitor.c"
         "geoip.c"
+        "wifi_monitor.c"
         "honeypot/rtsp_trap.c"
         "honeypot/http_trap.c"
         "honeypot/telnet_trap.c"

@@ -56,6 +56,8 @@ ShadowSentry S3 — автономний апаратний honeypot класу 
 
 > **Threat-intel збагачення.** Фоновий воркер резолвить кожен IP атакуючого у країну, ISP/ASN і репутаційний тег (`hosting` / `proxy` / `mobile`) через [ip-api.com](https://ip-api.com) — безкоштовно й без API-ключа, тож працює одразу після прошивки. Результат (з прапором країни) показується в дашборді та Telegram-алерті; приватні/LAN IP позначаються `Private LAN` без зовнішнього запиту. Запити йдуть поза гарячим шляхом і кешуються за IP. Налаштовується через `GEOIP_ENABLE` / `GEOIP_CACHE_SIZE` у `config.h`.
 
+> **Wi-Fi threat monitor (радіо-рівень).** ESP32 — це не лише TCP-стек, а Wi-Fi радіо. У promiscuous-режимі плата читає 802.11 management-фрейми і ловить **deauth / disassoc флуди** (поширений Wi-Fi DoS), яких **не бачить жоден** софтовий honeypot на звичайному мережевому стеку. Сплеск понад поріг піднімає подію `WiFi` з MAC передавача атакуючого та цільовим BSSID. Працює на каналі, до якого підключена плата, тож не рве зʼєднання — без channel-hopping. (Детекція rogue/evil-twin AP потребувала б стрибків по каналах — поки поза межами.) Налаштовується через `WIFI_MON_ENABLE` / `WIFI_MON_DEAUTH_THRESHOLD` у `config.h`.
+
 > **Детектор ARP-spoof / MITM.** Фонова задача періодично сканує ARP-кеш lwIP на ознаки отруєння — зміну MAC шлюзу після того, як вивчено стабільний baseline, або один MAC, що претендує на кілька IP — і піднімає подію `ARP` (стрічка дашборду + Telegram). Це ловить L2 man-in-the-middle атаки, до яких порт-пастки сліпі (вони ніколи не завершують TCP-handshake). Межі: детектиться спуфінг, націлений на цей хост або broadcast по всій мережі (типове для bettercap/ettercap); строго point-to-point спуфінг між двома іншими хостами — поза межами. Налаштовується через `ARP_MONITOR_ENABLE` / `ARP_SCAN_INTERVAL_S` / `ARP_ALERT_COOLDOWN_S` у `config.h`.
 
 **Детекція в дії.** Перевірено на реальній платі ESP32-S3 проти живого `bettercap` ARP-спуфу — щойно атакуючий отруїв запис шлюзу в кеші плати, монітор залогував це й надіслав Telegram-алерт (значення нижче анонімізовані):
@@ -245,6 +247,7 @@ ShadowSentryS3/
     ├── main.c                  Точка входу, розподіл задач по ядрах
     ├── wifi_manager.c/h        Wi-Fi STA, DHCP hostname, SNTP, mDNS, ARP-хелпери
     ├── arp_monitor.c/h         Детектор ARP-spoof / MITM              (Core 1)
+    ├── wifi_monitor.c/h        Детектор Wi-Fi deauth-флуду (promisc)  (Core 1)
     ├── geoip.c/h               Threat-intel збагачення (ip-api.com)   (Core 1)
     ├── index.html              Dashboard HTML (вбудовується в прошивку)
     ├── CMakeLists.txt
@@ -279,6 +282,7 @@ ShadowSentryS3/
 | Веб-сканер | GET / на port 80 | < 1 сек |
 | Ручний скан (nmap) | SYN на будь-який порт | < 1 сек |
 | ARP-spoofing / MITM | Зміна MAC шлюзу або один MAC на кількох IP | ≤ інтервал скану (8 сек) |
+| Wi-Fi deauth / disassoc флуд | Сплеск 802.11 management-фреймів (promiscuous) | ≤ вікно (2 сек) |
 
 ---
 

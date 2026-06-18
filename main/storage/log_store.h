@@ -10,6 +10,7 @@ typedef enum {
     ATTACK_SSH    = 3,
     ATTACK_FTP    = 4,
     ATTACK_ARP    = 5,   // ARP-spoof / MITM detection (not a port honeypot)
+    ATTACK_WIFI   = 6,   // 802.11 radio-layer attack (deauth/disassoc flood)
 } attack_type_t;
 
 typedef struct {

@@ -15,6 +15,7 @@
 #include "telegram.h"
 #include "arp_monitor.h"
 #include "geoip.h"
+#include "wifi_monitor.h"
 #include "config.h"
 
 static const char *TAG = "MAIN";
@@ -63,6 +64,9 @@ static const char *TAG = "MAIN";
 //           + client internal frame (~1.5 KB) + overhead (~1 KB)
 //           → 5120 gives ~2 KB headroom
 #define STACK_GEOIP     5120
+//  wifimon: promiscuous setup + MAC format buffers + attack_log_t(240)
+//           + overhead (~1200)  → 3072 gives ~1.5 KB headroom
+#define STACK_WIFIMON   3072
 
 // Priority 5 = equal to lwIP core; keeps honeypot latency low.
 // Telegram is 3 — non-critical, may wait behind WiFi driver work on Core 1.
@@ -72,6 +76,7 @@ static const char *TAG = "MAIN";
 #define PRIO_TELEGRAM   3
 #define PRIO_ARPMON     2
 #define PRIO_GEOIP      3
+#define PRIO_WIFIMON    2
 
 // ── Helper macro ──────────────────────────────────────────────────────────────
 
@@ -151,6 +156,7 @@ void app_main(void)
              (TELEGRAM_BOT_TOKEN[0] == 'Y') ? "NOT CONFIGURED" : "enabled");
     ESP_LOGI(TAG, "  │  ARP-spoof / MITM monitor: active");
     ESP_LOGI(TAG, "  │  Threat-intel enrichment: ip-api.com");
+    ESP_LOGI(TAG, "  │  Wi-Fi threat monitor: deauth/disassoc flood");
     ESP_LOGI(TAG, "  └─────────────────────────────────────────");
     ESP_LOGI(TAG, "");
 
@@ -170,6 +176,7 @@ void app_main(void)
     SPAWN(telegram_task,    "tg",     STACK_TELEGRAM, PRIO_TELEGRAM, 1);
     SPAWN(admin_panel_task, "admin",  STACK_ADMIN,    PRIO_ADMIN,    1);
     SPAWN(arp_monitor_task, "arpmon", STACK_ARPMON,   PRIO_ARPMON,   1);
+    SPAWN(wifi_monitor_task,"wifimon",STACK_WIFIMON,  PRIO_WIFIMON,  1);
 
     ESP_LOGI(TAG, "All tasks spawned — free heap: %lu B",
              (unsigned long)esp_get_free_heap_size());
