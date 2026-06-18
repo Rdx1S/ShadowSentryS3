@@ -7,6 +7,7 @@
 **🌐 Мова:** [English](README.md) · **Українська**
 
 [![Release](https://img.shields.io/github/v/release/Rdx1S/ShadowSentryS3?logo=github&color=success)](https://github.com/Rdx1S/ShadowSentryS3/releases/latest)
+[![Hackaday](https://img.shields.io/badge/Hackaday-project-1A1A1A?logo=hackaday&logoColor=yellow)](https://hackaday.io/project/205961-shadowsentry-s3-esp32-hardware-honeypot)
 ![Platform](https://img.shields.io/badge/platform-ESP32--S3-E7352C?logo=espressif&logoColor=white)
 ![Framework](https://img.shields.io/badge/framework-ESP--IDF%20v5.x-blue)
 ![Language](https://img.shields.io/badge/language-C-555555?logo=c&logoColor=white)
