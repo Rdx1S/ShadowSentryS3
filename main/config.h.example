@@ -96,6 +96,11 @@
 // fallback. Unauthenticated (emits the same attack metadata as the LAN panel).
 #define ADMIN_WS_PORT               9998
 
+// Demo/showcase endpoint. When 1, the dashboard's "Demo" button (POST /api/demo,
+// admin-auth) injects a set of synthetic attacks — fake MACs + global source IPs
+// — so the feed fills for screenshots / demo GIFs. Set to 0 for a real deployment.
+#define DEMO_ENDPOINT_ENABLE        1
+
 // ── Honeypot ports ────────────────────────────────────────────────────────────
 //
 // Standard ports that IoT malware and network scanners probe first.

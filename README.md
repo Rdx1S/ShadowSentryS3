@@ -11,7 +11,9 @@
 ![Alerts](https://img.shields.io/badge/alerts-Telegram-26A5E4?logo=telegram&logoColor=white)
 ![Status](https://img.shields.io/badge/status-active-success)
 
-![ShadowSentry S3 Dashboard](docs/dashboard.png)
+![ShadowSentry S3 Dashboard](docs/demo.gif)
+
+<sub>Live dashboard streaming attacks in real time. Generate this view yourself with the **Demo** button (synthetic attacks, no real data).</sub>
 
 ShadowSentry S3 is a self-contained **Edge Deception** hardware honeypot. It turns a single ESP32-S3 board (~$5) into an invisible trap for botnets, scanners and malware inside your local network. No Raspberry Pi, no cloud servers, no external databases — all processing and logging happen on one chip.
 
@@ -36,6 +38,7 @@ ShadowSentry S3 is a self-contained **Edge Deception** hardware honeypot. It tur
 - **SPIFFS persistence** — attack log ring buffer + all-time counter survive reboots.
 - **Dual-core design** — honeypot traps on Core 0, admin/alerting/monitors on Core 1.
 - **Zero-config & serverless** — flash, set Wi-Fi + Telegram token, done. mDNS `.local` name, no cloud, no database.
+- **One-click demo** — a `Demo` button injects synthetic attacks from around the world (fake MACs, real GeoIP flags) so you can showcase the dashboard / record a GIF without exposing real data. Disable with `DEMO_ENDPOINT_ENABLE 0`.
 
 ---
 
@@ -237,7 +240,7 @@ Login: `admin` / the password from `ADMIN_PASSWORD`.
 
 ## Admin Dashboard
 
-A dark-mode web interface with a real-time WebSocket feed (new attacks appear instantly), backed by a 10-second poll for reconciliation and threat-intel updates:
+A dark-mode web interface with a real-time WebSocket feed (new attacks appear instantly), backed by a 10-second poll for reconciliation and threat-intel updates. Every stat card and distribution row is **clickable to filter** the feed/table by attack type, and the **Demo** button seeds a sample of global attacks for screenshots:
 
 - **6 stat cards** — Total, Unique IPs, RTSP, HTTP, Telnet, SSH, FTP
 - **Donut chart** — real-time breakdown of attacks per protocol
