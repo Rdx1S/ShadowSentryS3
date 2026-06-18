@@ -12,6 +12,7 @@
 #include "ssh_trap.h"
 #include "ftp_trap.h"
 #include "admin_panel.h"
+#include "ws_server.h"
 #include "telegram.h"
 #include "arp_monitor.h"
 #include "geoip.h"
@@ -183,6 +184,9 @@ void app_main(void)
     SPAWN(admin_panel_task, "admin",  STACK_ADMIN,    PRIO_ADMIN,    1);
     SPAWN(arp_monitor_task, "arpmon", STACK_ARPMON,   PRIO_ARPMON,   1);
     SPAWN(wifi_monitor_task,"wifimon",STACK_WIFIMON,  PRIO_WIFIMON,  1);
+
+    // Live WebSocket push server (esp_http_server manages its own task).
+    ws_server_start();
 
     ESP_LOGI(TAG, "All tasks spawned — free heap: %lu B",
              (unsigned long)esp_get_free_heap_size());

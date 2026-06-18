@@ -15,3 +15,5 @@ CONFIG_LWIP_MAX_SOCKETS=16
 CONFIG_ESP_TASK_WDT_EN=n
 # wolfSSL: compile in wolfSSH support (wc_SSH_KDF etc.) so the real SSH server builds
 CONFIG_ESP_ENABLE_WOLFSSH=y
+# esp_http_server: WebSocket support for the live dashboard push server
+CONFIG_HTTPD_WS_SUPPORT=y

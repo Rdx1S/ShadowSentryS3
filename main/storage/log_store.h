@@ -30,6 +30,11 @@ void log_store_init(void);
 // Thread-safe: can be called from any core/task
 void log_store_append(const attack_log_t *entry);
 
+// Register a real-time listener invoked on every log_store_append() (used by the
+// WebSocket dashboard to push events live). The callback runs in the appending
+// task's context, so it MUST be non-blocking. Pass NULL to clear. One listener.
+void log_store_set_listener(void (*cb)(const attack_log_t *entry));
+
 // Copy up to max_count most-recent entries into out[], newest first.
 // Returns actual number of entries copied.
 int  log_store_get_recent(attack_log_t *out, int max_count);

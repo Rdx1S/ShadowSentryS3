@@ -19,6 +19,14 @@ static uint32_t      s_total = 0;   // all-time counter (survives clear via SPIF
 static SemaphoreHandle_t s_mutex;
 static bool              s_spiffs_ok = false;
 
+// Optional real-time listener (WebSocket dashboard). Invoked on every append.
+static void (*s_listener)(const attack_log_t *entry) = NULL;
+
+void log_store_set_listener(void (*cb)(const attack_log_t *entry))
+{
+    s_listener = cb;
+}
+
 // ── SPIFFS helpers ────────────────────────────────────────────────────────────
 
 static void persist_counter(void)
@@ -105,6 +113,10 @@ void log_store_append(const attack_log_t *entry)
     s_total++;
 
     xSemaphoreGive(s_mutex);
+
+    // Notify the live listener (WebSocket dashboard) so it can push this event
+    // in real time. Must be non-blocking — it runs in the caller's task.
+    if (s_listener) s_listener(entry);
 
     // Kick off async threat-intel enrichment for this attacker IP (non-blocking;
     // result is cached by IP and read later by the dashboard / Telegram).

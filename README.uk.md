@@ -31,7 +31,7 @@ ShadowSentry S3 — автономний апаратний honeypot класу 
 - **Threat-intel / GeoIP збагачення** — резолвить IP атакуючого в країну, ISP/ASN і репутаційний тег (`hosting`/`proxy`/`mobile`) через ip-api.com; приватні IP позначаються `Private LAN` без зовнішнього запиту.
 
 **Платформа**
-- **Live веб-дашборд + REST API** на порту 9999 (HTTP Basic Auth) — картки статистики, стрічка атак, клікабельне модальне вікно деталей.
+- **Live веб-дашборд + REST API** на порту 9999 (HTTP Basic Auth) — картки статистики, стрічка атак, клікабельне модальне вікно деталей. Окремий **WebSocket push-сервер** (порт 9998) стрімить кожну нову атаку в дашборд у реальному часі — стрічка оновлюється миттєво, не чекаючи наступного опитування.
 - **Telegram-сповіщення** — асинхронна черга зі стійкою доставкою (чекає реконект + ретраїть, тож алерт переживає той самий deauth, що скинув плату з мережі).
 - **SPIFFS-персистентність** — кільцевий буфер логів + лічильник за весь час переживають перезавантаження.
 - **Двоядерна архітектура** — пастки на Core 0, адмінка/сповіщення/монітори на Core 1.
@@ -237,7 +237,7 @@ I (1938) ADMIN: Admin panel on port 9999
 
 ## Admin Dashboard
 
-Dark-mode веб-інтерфейс з авто-оновленням кожні 10 секунд:
+Dark-mode веб-інтерфейс із WebSocket-стрічкою в реальному часі (нові атаки зʼявляються миттєво) + опитування раз на 10 секунд для звірки й оновлення threat-intel:
 
 - **6 карток статистики** — Total, Unique IPs, RTSP, HTTP, Telnet, SSH, FTP
 - **Donut chart** — розбивка атак по протоколах у реальному часі
@@ -285,6 +285,7 @@ ShadowSentryS3/
     │   └── ftp_trap.c/h        Port 21, Fake vsFTPd 3.0.5, full creds
     ├── admin/                  ── Core 1 — Admin World ───────────────
     │   ├── admin_panel.c/h     Port 9999, HTTP Basic Auth, REST API
+    │   ├── ws_server.c/h       Port 9998, live WebSocket push подій
     │   └── telegram.c/h        Async FreeRTOS queue → Telegram Bot API
     └── storage/
         └── log_store.c/h       RAM ring buffer (200 записів) + SPIFFS
@@ -376,9 +377,9 @@ TELEGRAM_CHAT_ID — число (може бути від'ємним для гр
 - [x] Wi-Fi монітор deauth/disassoc (класифікація за reason-кодом)
 - [x] Інтерактивна фейкова оболонка з логуванням команд + IOC (Telnet)
 - [x] Справжній SSH-сервер через wolfSSH — захоплення кредів + фейкова оболонка
+- [x] Live WebSocket-дашборд — push подій у реальному часі (fallback на опитування)
 
 **Заплановано**
-- [ ] Live WebSocket-дашборд (реальний push замість опитування)
 - [ ] Підміна version-банера SSH (видавати за OpenSSH, не wolfSSH)
 - [ ] Генерація SSH host-key на пристрої при першому буті (кеш у NVS)
 - [ ] Виявлення rogue / evil-twin AP (потребує channel hopping)

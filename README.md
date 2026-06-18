@@ -31,7 +31,7 @@ ShadowSentry S3 is a self-contained **Edge Deception** hardware honeypot. It tur
 - **Threat-intel / GeoIP enrichment** — resolves each attacker IP to country, ISP/ASN and a reputation tag (`hosting`/`proxy`/`mobile`) via ip-api.com; private IPs labelled `Private LAN` with no external call.
 
 **Platform**
-- **Live web dashboard + REST API** on port 9999 (HTTP Basic Auth) — stat cards, attack feed, clickable attack-detail modal.
+- **Live web dashboard + REST API** on port 9999 (HTTP Basic Auth) — stat cards, attack feed, clickable attack-detail modal. A dedicated **WebSocket push server** (port 9998) streams every new attack to the dashboard in real time, so the feed updates the instant a probe lands instead of waiting for the next poll.
 - **Telegram alerts** — async queue with resilient delivery (waits for reconnect + retries, so an alert survives the very deauth that knocks the board offline).
 - **SPIFFS persistence** — attack log ring buffer + all-time counter survive reboots.
 - **Dual-core design** — honeypot traps on Core 0, admin/alerting/monitors on Core 1.
@@ -237,7 +237,7 @@ Login: `admin` / the password from `ADMIN_PASSWORD`.
 
 ## Admin Dashboard
 
-A dark-mode web interface that auto-refreshes every 10 seconds:
+A dark-mode web interface with a real-time WebSocket feed (new attacks appear instantly), backed by a 10-second poll for reconciliation and threat-intel updates:
 
 - **6 stat cards** — Total, Unique IPs, RTSP, HTTP, Telnet, SSH, FTP
 - **Donut chart** — real-time breakdown of attacks per protocol
@@ -285,6 +285,7 @@ ShadowSentryS3/
     │   └── ftp_trap.c/h        Port 21, Fake vsFTPd 3.0.5, full creds
     ├── admin/                  ── Core 1 — Admin World ───────────────
     │   ├── admin_panel.c/h     Port 9999, HTTP Basic Auth, REST API
+    │   ├── ws_server.c/h       Port 9998, live WebSocket event push
     │   └── telegram.c/h        Async FreeRTOS queue → Telegram Bot API
     └── storage/
         └── log_store.c/h       RAM ring buffer (200 entries) + SPIFFS
@@ -376,9 +377,9 @@ TELEGRAM_CHAT_ID is a number (can be negative for groups).
 - [x] Wi-Fi deauth/disassoc threat monitor (reason-code classified)
 - [x] Interactive fake shell with per-command logging + IOC escalation (Telnet)
 - [x] Real SSH server via wolfSSH — credential capture + fake shell
+- [x] Live WebSocket dashboard — real-time event push (polling fallback)
 
 **Planned**
-- [ ] Live WebSocket dashboard (real-time push instead of polling)
 - [ ] SSH version-banner spoofing (present as OpenSSH, not wolfSSH)
 - [ ] Per-device SSH host-key generation at first boot (NVS-cached)
 - [ ] Rogue / evil-twin AP detection (requires channel hopping)

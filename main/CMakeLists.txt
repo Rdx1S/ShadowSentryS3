@@ -33,6 +33,7 @@ idf_component_register(
         "honeypot/ssh_trap.c"
         "honeypot/ftp_trap.c"
         "admin/admin_panel.c"
+        "admin/ws_server.c"
         "admin/telegram.c"
         "storage/log_store.c"
 
@@ -73,4 +74,7 @@ idf_component_register(
 
         # HTTP client
         esp_http_client     # telegram.c — HTTPS POST to Telegram Bot API
+
+        # HTTP server (WebSocket)
+        esp_http_server     # ws_server.c — live WebSocket push to the dashboard
 )

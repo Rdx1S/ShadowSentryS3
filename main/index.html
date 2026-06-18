@@ -618,6 +618,30 @@ async function loadStatus(){
   }catch{}
 }
 load();loadStatus();setInterval(load,10000);setInterval(loadStatus,10000);
+
+// live push — WebSocket on the dedicated port; falls back silently to polling
+function applyEntry(e){
+  const key=`${e.ts}-${e.ip}-${e.type}`;
+  if(_seen.has(key))return;                       // poll already showed it
+  if(!_entries.some(x=>`${x.ts}-${x.ip}-${x.type}`===key)){
+    _entries.unshift(e);if(_entries.length>50)_entries.pop();
+  }
+  const bt=[0,0,0,0,0];_entries.forEach(x=>{if(x.type<5)bt[x.type]++;});
+  setVal('s-total',(_prev['s-total']||0)+1);
+  setVal('s-ips',new Set(_entries.map(x=>x.ip)).size);
+  setVal('s-rtsp',bt[0]);setVal('s-http',bt[1]);setVal('s-telnet',bt[2]);setVal('s-ssh',bt[3]);setVal('s-ftp',bt[4]);
+  updateDonut(bt[0],bt[1],bt[2],bt[3],bt[4]);
+  updateFeed([e]);updateTable(_entries);setOnline(true);
+}
+function connectWS(){
+  let ws;
+  try{ws=new WebSocket(`ws://${location.hostname}:9998/ws`);}
+  catch{return void setTimeout(connectWS,5000);}
+  ws.onmessage=ev=>{try{applyEntry(JSON.parse(ev.data));}catch{}};
+  ws.onclose=()=>setTimeout(connectWS,3000);       // auto-reconnect
+  ws.onerror=()=>{try{ws.close();}catch{}};
+}
+connectWS();
 </script>
 </body>
 </html>

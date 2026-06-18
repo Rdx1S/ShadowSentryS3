@@ -91,6 +91,11 @@
 #define ADMIN_PORT                  9999
 #define ADMIN_PASSWORD              "changeme1"
 
+// Dedicated port for the live WebSocket push server (real-time dashboard feed).
+// The browser connects to ws://<device-ip>:ADMIN_WS_PORT/ws; polling is the
+// fallback. Unauthenticated (emits the same attack metadata as the LAN panel).
+#define ADMIN_WS_PORT               9998
+
 // ── Honeypot ports ────────────────────────────────────────────────────────────
 //
 // Standard ports that IoT malware and network scanners probe first.
@@ -200,6 +205,11 @@ _Static_assert(sizeof(ADMIN_PASSWORD) >= 9,
 
 _Static_assert(ADMIN_PORT >= 1024 && ADMIN_PORT <= 65535,
     "ADMIN_PORT must be in range 1024–65535");
+
+_Static_assert(ADMIN_WS_PORT >= 1024 && ADMIN_WS_PORT <= 65534,
+    "ADMIN_WS_PORT must be in range 1024–65534 (its control port is +1)");
+_Static_assert(ADMIN_WS_PORT != ADMIN_PORT,
+    "ADMIN_WS_PORT must differ from ADMIN_PORT");
 
 // mDNS label: at least 1 char, max 31 (RFC 1035 label limit is 63; keep margin)
 _Static_assert(sizeof(MDNS_HOSTNAME) >= 2 && sizeof(MDNS_HOSTNAME) <= 32,
