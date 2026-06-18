@@ -21,9 +21,11 @@
 #define ADMIN_WS_PORT   9998
 #endif
 
-// Maximum simultaneous dashboard WebSocket clients.
+// Maximum simultaneous dashboard WebSocket clients. Kept small: every slot the
+// WS httpd reserves is an lwIP socket taken from the shared pool that the 6
+// honeypot listeners + admin panel + Telegram/GeoIP clients also draw on.
 #ifndef ADMIN_WS_MAX_CLIENTS
-#define ADMIN_WS_MAX_CLIENTS  4
+#define ADMIN_WS_MAX_CLIENTS  3
 #endif
 
 // Start the WebSocket push server and hook it into the log store. Call once
