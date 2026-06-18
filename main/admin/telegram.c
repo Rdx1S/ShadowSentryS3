@@ -113,6 +113,30 @@ done:
 
 // ── HTTPS sender ──────────────────────────────────────────────────────────────
 
+// Captures the start of the Telegram API response body so the outcome can be
+// logged. On success Telegram returns {"ok":true,"result":{"message_id":...,
+// "chat":{"id":...}}} — the chat id confirms exactly where the alert landed,
+// which is the quickest way to debug "the bot sends OK but I see nothing"
+// (almost always a stale TELEGRAM_CHAT_ID). On failure the body carries
+// {"ok":false,"error_code":...,"description":"..."}. Single-threaded sender, so
+// one static buffer is safe.
+static char s_resp[320];
+static int  s_resp_len;
+
+static esp_err_t tg_http_event(esp_http_client_event_t *evt)
+{
+    if (evt->event_id == HTTP_EVENT_ON_DATA && evt->data && evt->data_len > 0) {
+        int room = (int)sizeof(s_resp) - 1 - s_resp_len;
+        int n = evt->data_len < room ? evt->data_len : room;
+        if (n > 0) {
+            memcpy(s_resp + s_resp_len, evt->data, n);
+            s_resp_len += n;
+            s_resp[s_resp_len] = '\0';
+        }
+    }
+    return ESP_OK;
+}
+
 // Sends html_text to the configured Telegram chat. Returns true only on a
 // confirmed HTTP 200. html_text may contain Telegram-supported HTML tags
 // (<b>, <code>, etc.) and actual Unicode — but NOT raw double-quotes or backslashes.
@@ -138,6 +162,7 @@ static bool send_message(const char *html_text)
         .transport_type    = HTTP_TRANSPORT_OVER_SSL,
         .crt_bundle_attach = esp_crt_bundle_attach,   // validates api.telegram.org cert
         .timeout_ms        = TELEGRAM_HTTP_TIMEOUT_MS,
+        .event_handler     = tg_http_event,           // capture response body
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&cfg);
@@ -149,6 +174,9 @@ static bool send_message(const char *html_text)
     esp_http_client_set_header(client, "Content-Type", "application/json");
     esp_http_client_set_post_field(client, body, body_len);
 
+    s_resp[0] = '\0';
+    s_resp_len = 0;
+
     bool ok = false;
     esp_err_t err = esp_http_client_perform(client);
     if (err != ESP_OK) {
@@ -158,7 +186,10 @@ static bool send_message(const char *html_text)
         if (status == 429)
             ESP_LOGW(TAG, "Rate limited by Telegram (HTTP 429) — increase TELEGRAM_RATE_LIMIT_MS");
         else if (status != 200)
-            ESP_LOGW(TAG, "Unexpected HTTP %d from Telegram", status);
+            // Telegram's error body carries the reason (e.g. {"ok":false,
+            // "error_code":400,"description":"chat not found"}) — log it so a
+            // misconfigured chat id / token is obvious from the serial console.
+            ESP_LOGW(TAG, "Telegram HTTP %d — response: %s", status, s_resp);
         else {
             ESP_LOGI(TAG, "Alert sent OK");
             ok = true;
