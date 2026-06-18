@@ -263,8 +263,6 @@ footer{
   &nbsp;
   <span class="pill pill-live" id="status-pill"><span class="dot"></span>ACTIVE</span>
   &nbsp;&nbsp;
-  <button class="clear-btn" onclick="demoSeed(this)" title="Inject sample attacks for a demo">&#127902; Demo</button>
-  &nbsp;
   <button class="clear-btn" onclick="clearLogs()">&#128465; Clear Logs</button>
 </header>
 
@@ -648,13 +646,6 @@ async function clearLogs(){
   if(!confirm('Wipe all attack logs from flash memory?'))return;
   try{await fetch('/api/clear',{method:'POST'});_seen.clear();document.getElementById('feed').innerHTML='<div class="feed-empty">Waiting for attackers…</div>';load();}
   catch{alert('Clear failed');}
-}
-async function demoSeed(btn){
-  // Inject a sample attack set (fake MACs + global IPs) — streams into the feed
-  // live via WebSocket. Great for screenshots / demo GIFs.
-  if(btn){btn.disabled=true;const t=btn.innerHTML;btn.innerHTML='&#9203; Seeding…';
-    setTimeout(()=>{btn.disabled=false;btn.innerHTML=t;},6000);}
-  try{await fetch('/api/demo',{method:'POST'});}catch{}
 }
 async function loadStatus(){
   try{
