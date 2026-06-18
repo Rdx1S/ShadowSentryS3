@@ -4,7 +4,7 @@
 
 > Zero-Configuration, Serverless Hardware Honeypot on a Single ESP32-S3
 
-**🌐 Language:** **English** · [Українська](README.uk.md)
+**🌐 Language:** **English** · [Українська](README.ua.md)
 
 [![Release](https://img.shields.io/github/v/release/Rdx1S/ShadowSentryS3?logo=github&color=success)](https://github.com/Rdx1S/ShadowSentryS3/releases/latest)
 ![Platform](https://img.shields.io/badge/platform-ESP32--S3-E7352C?logo=espressif&logoColor=white)
