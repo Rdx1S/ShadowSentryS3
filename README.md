@@ -17,6 +17,28 @@ ShadowSentry S3 is a self-contained **Edge Deception** hardware honeypot. It tur
 
 ---
 
+## Features
+
+**Honeypot traps (Core 0)**
+- **5 protocol traps** — RTSP (554, fake Hikvision camera), HTTP (80, fake NVR login + per-request fingerprinting), Telnet (23), SSH (22), FTP (21). Every credential pair is captured.
+- **Real SSH server (wolfSSH)** — genuine SSH-2.0 handshake (curve25519 + ECDSA host key) that decrypts the auth exchange and **captures the plaintext username + password** — not just a banner fingerprint.
+- **Interactive fake shell (Cowrie-style)** — Telnet *and* SSH accept the login and drop the attacker into a believable Ubuntu 20.04 shell that answers recon commands while **logging every command**; download/exec commands (`wget`/`curl`/`chmod +x`/`./…`) are flagged as IOCs and escalated.
+
+**Network & radio monitors (Core 1)**
+- **ARP-spoof / MITM monitor** — watches the lwIP ARP cache for cache-poisoning signatures (gateway MAC change, one MAC claiming many IPs).
+- **Wi-Fi threat monitor** — detects 802.11 deauth/disassoc attacks (incl. the single-frame deauth used for handshake capture) via reason-code-classified forced disconnects + promiscuous broadcast-flood sniffing.
+- **MAC + vendor** for every event — resolves the attacker's L2 MAC from the ARP table with a best-effort OUI vendor guess; randomized (private) MACs flagged.
+- **Threat-intel / GeoIP enrichment** — resolves each attacker IP to country, ISP/ASN and a reputation tag (`hosting`/`proxy`/`mobile`) via ip-api.com; private IPs labelled `Private LAN` with no external call.
+
+**Platform**
+- **Live web dashboard + REST API** on port 9999 (HTTP Basic Auth) — stat cards, attack feed, clickable attack-detail modal.
+- **Telegram alerts** — async queue with resilient delivery (waits for reconnect + retries, so an alert survives the very deauth that knocks the board offline).
+- **SPIFFS persistence** — attack log ring buffer + all-time counter survive reboots.
+- **Dual-core design** — honeypot traps on Core 0, admin/alerting/monitors on Core 1.
+- **Zero-config & serverless** — flash, set Wi-Fi + Telegram token, done. mDNS `.local` name, no cloud, no database.
+
+---
+
 ## How it works
 
 Thanks to the dual-core Xtensa LX7 processor, the project is split into two isolated worlds:
@@ -337,6 +359,30 @@ idf.py -p /dev/ttyUSB0 flash
 Make sure the bot isn't blocked and you sent it /start.
 TELEGRAM_CHAT_ID is a number (can be negative for groups).
 ```
+
+---
+
+## Roadmap
+
+**Shipped**
+- [x] 5 protocol honeypot traps (RTSP / HTTP / Telnet / SSH / FTP)
+- [x] Per-attack MAC + vendor (OUI) resolution
+- [x] HTTP request fingerprinting (method / path / User-Agent)
+- [x] Telegram alerts with resilient delivery + retry
+- [x] Live web dashboard + REST API, clickable attack-detail modal
+- [x] mDNS `.local` resolution
+- [x] ARP-spoof / MITM monitor
+- [x] Threat-intel / GeoIP enrichment (country · ASN · reputation)
+- [x] Wi-Fi deauth/disassoc threat monitor (reason-code classified)
+- [x] Interactive fake shell with per-command logging + IOC escalation (Telnet)
+- [x] Real SSH server via wolfSSH — credential capture + fake shell
+
+**Planned**
+- [ ] Live WebSocket dashboard (real-time push instead of polling)
+- [ ] SSH version-banner spoofing (present as OpenSSH, not wolfSSH)
+- [ ] Per-device SSH host-key generation at first boot (NVS-cached)
+- [ ] Rogue / evil-twin AP detection (requires channel hopping)
+- [ ] Additional protocol traps (SMB, MQTT, UPnP)
 
 ---
 
