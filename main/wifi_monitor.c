@@ -20,7 +20,14 @@
 #define WIFI_MON_WINDOW_MS          2000    // evaluation window
 #endif
 #ifndef WIFI_MON_DEAUTH_THRESHOLD
-#define WIFI_MON_DEAUTH_THRESHOLD   20      // deauth+disassoc frames per window = flood
+// deauth+disassoc frames per window that count as a flood. Kept low on purpose:
+// a deauth attack knocks THIS station off the air, so it only sniffs a partial
+// burst (~5-10 frames) before it loses the channel to reconnect. Normal traffic
+// shows 0-1 disassoc per window, so 5 separates attack from noise with margin.
+#define WIFI_MON_DEAUTH_THRESHOLD   5
+#endif
+#ifndef WIFI_MON_ROLL_WINDOWS
+#define WIFI_MON_ROLL_WINDOWS       5       // windows summed (×WINDOW_MS = span)
 #endif
 #ifndef WIFI_MON_COOLDOWN_S
 #define WIFI_MON_COOLDOWN_S         60      // min seconds between flood alerts
@@ -73,7 +80,8 @@ static void raise_flood_alert(uint32_t count, const uint8_t src[6], const uint8_
     memcpy(e.src_mac, src, 6);
     snprintf(e.payload, sizeof(e.payload),
              "Deauth flood: %lu frames/%dms from %s -> BSSID %s",
-             (unsigned long)count, WIFI_MON_WINDOW_MS, src_s, bssid_s);
+             (unsigned long)count, WIFI_MON_ROLL_WINDOWS * WIFI_MON_WINDOW_MS,
+             src_s, bssid_s);
 
     ESP_LOGW(TAG, "%s", e.payload);
     log_store_append(&e);
@@ -98,9 +106,14 @@ void wifi_monitor_task(void *arg)
         vTaskDelete(NULL);
     }
     ESP_LOGI(TAG, "Wi-Fi threat monitor running (deauth flood >= %d / %dms)",
-             WIFI_MON_DEAUTH_THRESHOLD, WIFI_MON_WINDOW_MS);
+             WIFI_MON_DEAUTH_THRESHOLD, WIFI_MON_ROLL_WINDOWS * WIFI_MON_WINDOW_MS);
 
     time_t last_alert = 0;
+    // Rolling sum over the last ROLL windows. A deauth attack knocks this
+    // station off-channel, so it only sniffs the flood in sporadic bursts —
+    // summing several windows catches it where a single window would miss.
+    uint32_t ring[WIFI_MON_ROLL_WINDOWS] = {0};
+    int ri = 0;
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(WIFI_MON_WINDOW_MS));
@@ -114,12 +127,18 @@ void wifi_monitor_task(void *arg)
         s_count = 0;                             // reset window
         portEXIT_CRITICAL(&s_mux);
 
-        if (count >= WIFI_MON_DEAUTH_THRESHOLD) {
+        ring[ri] = count;
+        ri = (ri + 1) % WIFI_MON_ROLL_WINDOWS;
+        uint32_t sum = 0;
+        for (int i = 0; i < WIFI_MON_ROLL_WINDOWS; i++) sum += ring[i];
+
+        if (sum >= WIFI_MON_DEAUTH_THRESHOLD) {
             time_t now = time(NULL);
             if (now - last_alert >= WIFI_MON_COOLDOWN_S) {
                 last_alert = now;
-                raise_flood_alert(count, src, bssid);
+                raise_flood_alert(sum, src, bssid);
             }
+            memset(ring, 0, sizeof(ring));       // avoid immediate re-trigger
         }
     }
 #endif  // WIFI_MON_ENABLE

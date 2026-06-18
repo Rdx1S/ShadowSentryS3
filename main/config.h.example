@@ -160,8 +160,12 @@
 // Works while the device stays connected (no channel hopping). All values
 // optional — wifi_monitor.c falls back to these defaults.
 #define WIFI_MON_ENABLE             1       // 0 = disable the monitor task
-#define WIFI_MON_WINDOW_MS          2000    // evaluation window length
-#define WIFI_MON_DEAUTH_THRESHOLD   20      // deauth+disassoc frames/window = flood
+#define WIFI_MON_WINDOW_MS          2000    // tick length
+#define WIFI_MON_ROLL_WINDOWS       5       // windows summed → ~10s detection span
+// Kept low: a deauth attack knocks this station off the channel, so it only
+// sniffs the flood in sporadic bursts. Summing ~10s of windows catches it;
+// normal traffic is 0-1 disassoc per window, so 5 separates attack from noise.
+#define WIFI_MON_DEAUTH_THRESHOLD   5       // deauth+disassoc within the rolling span
 #define WIFI_MON_COOLDOWN_S         60      // min seconds between flood alerts
 
 // ── Compile-time validation ───────────────────────────────────────────────────
