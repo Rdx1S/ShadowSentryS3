@@ -152,12 +152,16 @@ static void serve_dashboard(int sock)
 
 static void serve_attacks_json(int sock)
 {
-    attack_log_t entries[ADMIN_MAX_LOG_ENTRIES];
+    // Static, not stack: ADMIN_MAX_LOG_ENTRIES × sizeof(attack_log_t) is ~12 KB,
+    // which alone overflows the admin task stack. Safe because the accept loop is
+    // single-threaded — only one client is served at a time on Core 1 (same
+    // reasoning as the static json[] buffer below).
+    static attack_log_t entries[ADMIN_MAX_LOG_ENTRIES];
+    static uint32_t     seen_ips[ADMIN_MAX_LOG_ENTRIES];
     int      n      = log_store_get_recent(entries, ADMIN_MAX_LOG_ENTRIES);
     uint32_t total  = log_store_total_count();
 
     // Compute per-type counts and unique-IP count from the current window
-    uint32_t seen_ips[ADMIN_MAX_LOG_ENTRIES];
     int      unique   = 0;
     int      by_type[5] = {0};
 
