@@ -33,6 +33,7 @@ static char s_boot_ip[INET_ADDRSTRLEN];
 #define EMOJI_ARP    "\xF0\x9F\x95\xB8"   // 🕸  (U+1F578 — spoof / MITM web)
 #define EMOJI_GEO    "\xF0\x9F\x93\x8D"   // 📍 (U+1F4CD — geolocation)
 #define EMOJI_WIFI   "\xF0\x9F\x93\xA1"   // 📡 (U+1F4E1 — radio-layer attack)
+#define EMOJI_SHELL  "\xF0\x9F\x90\x9A"   // 🐚 (U+1F41A — interactive fake shell)
 
 // Convert a 2-letter ISO country code into its flag emoji (two regional-
 // indicator code points, 8 UTF-8 bytes + NUL). Writes "" for an invalid code.
@@ -52,8 +53,8 @@ static void cc_flag(const char *cc, char *out)
     out[o] = '\0';
 }
 
-static const char *s_type_label[] = {"RTSP", "HTTP", "Telnet", "SSH", "FTP", "ARP", "WiFi"};
-static const char *s_type_emoji[] = {EMOJI_RTSP, EMOJI_HTTP, EMOJI_TELNET, EMOJI_SSH, EMOJI_FTP, EMOJI_ARP, EMOJI_WIFI};
+static const char *s_type_label[] = {"RTSP", "HTTP", "Telnet", "SSH", "FTP", "ARP", "WiFi", "Shell"};
+static const char *s_type_emoji[] = {EMOJI_RTSP, EMOJI_HTTP, EMOJI_TELNET, EMOJI_SSH, EMOJI_FTP, EMOJI_ARP, EMOJI_WIFI, EMOJI_SHELL};
 
 // ── String escaping helpers ───────────────────────────────────────────────────
 
@@ -287,6 +288,20 @@ void telegram_task(void *arg)
                 "%s\n"
                 EMOJI_LOG   " <code>%.200s</code>",
                 ip_str,
+                mac_line,
+                pay_h);
+        } else if (entry.type == ATTACK_SHELL) {
+            // Interactive fake-shell: the attacker is "logged in". Show who they
+            // are and what they ran (payload = "shell session opened" or "$ <cmd>").
+            snprintf(msg, sizeof(msg),
+                EMOJI_ALERT " <b>ShadowSentry S3 Alert</b>\n\n"
+                EMOJI_SHELL " Attack: <b>Interactive shell</b>\n"
+                EMOJI_IP    " IP: <code>%s</code>\n"
+                EMOJI_CREDS " User: <code>%s</code>\n"
+                "%s\n"
+                EMOJI_LOG   " <code>%.200s</code>",
+                ip_str,
+                user_h,
                 mac_line,
                 pay_h);
         } else if (entry.type == ATTACK_SSH) {

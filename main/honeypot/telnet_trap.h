@@ -13,14 +13,32 @@
  *   2. Device sends a realistic Ubuntu 20.04 kernel banner + "login: " prompt
  *   3. Bot submits a username → device replies "Password: "
  *   4. Bot submits a password → credentials logged + Telegram alert sent
- *   5. Device replies "Login incorrect" and loops back to "login: "
- *   6. After TELNET_MAX_ATTEMPTS the connection is closed
+ *   5a. If the fake shell is enabled (TELNET_SHELL_ENABLE) and this is at least
+ *       the TELNET_LOGIN_GRANT_ATTEMPT-th try, the login "succeeds" and the
+ *       connection is handed to fake_shell_run() — a Cowrie-style interactive
+ *       shell that logs every command the attacker runs.
+ *   5b. Otherwise the device replies "Login incorrect" and loops to "login: ".
+ *   6. After TELNET_MAX_ATTEMPTS without a grant the connection is closed.
  *
  * IAC option negotiation bytes (0xFF prefix, 3-byte sequences) are silently
  * consumed so raw Telnet clients don't corrupt the captured credentials.
  *
  * Designed to run pinned to Core 0 (Hacker World).
  */
+
+// Master switch for the post-login fake shell. 0 = behave as a pure
+// credential collector (always "Login incorrect"); 1 = grant a shell.
+#ifndef TELNET_SHELL_ENABLE
+#define TELNET_SHELL_ENABLE     1
+#endif
+
+// Which login attempt is allowed to "succeed" and drop into the shell.
+// 1 = the first user/password pair is accepted (maximises captured commands);
+// a higher value makes the box look like it has a real, occasionally-correct
+// password. Credentials from every attempt are logged regardless.
+#ifndef TELNET_LOGIN_GRANT_ATTEMPT
+#define TELNET_LOGIN_GRANT_ATTEMPT  1
+#endif
 
 // Maximum queued TCP connections on port 23.
 #define TELNET_BACKLOG          4

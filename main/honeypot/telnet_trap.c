@@ -1,4 +1,5 @@
 #include "telnet_trap.h"
+#include "fake_shell.h"
 #include "log_store.h"
 #include "telegram.h"
 #include "wifi_manager.h"
@@ -95,8 +96,17 @@ static void handle_client(int sock, struct sockaddr_in *addr)
         log_store_append(&entry);
         telegram_notify(&entry);
 
-        send(sock, LOGIN_FAIL, strlen(LOGIN_FAIL), 0);
         attempts++;
+
+        // Grant the shell once the configured attempt is reached: the login
+        // "succeeds" and the attacker drops into the fake interactive shell,
+        // where every command is captured. Closes the connection afterwards.
+        if (TELNET_SHELL_ENABLE && attempts >= TELNET_LOGIN_GRANT_ATTEMPT) {
+            fake_shell_run(sock, addr, user[0] ? user : "root");
+            return;
+        }
+
+        send(sock, LOGIN_FAIL, strlen(LOGIN_FAIL), 0);
     }
 }
 

@@ -46,11 +46,13 @@ Attacker / bot
 |----------|----------|---------|
 | RTSP | Username + Password | `admin:12345` from the Basic Auth header |
 | HTTP | Username + Password + **path + User-Agent** | NVR login POST form; every request (GET/POST/other) is fingerprinted by path and the scanner's User-Agent |
-| Telnet | Username + Password | Interactive login prompt (up to 5 attempts) |
+| Telnet | Username + Password **+ post-login commands** | Login prompt, then a fake interactive shell that logs every command |
 | SSH | Client version string | `SSH-2.0-OpenSSH_7.4p1 Debian-10` |
 | FTP | Username + Password | `USER admin` / `PASS password` (RFC 959) |
 
 > SSH does not capture credentials — after the banner exchange all traffic is encrypted. The version string is still a useful attacker fingerprint.
+
+> **Interactive fake shell (Cowrie-style).** Instead of endlessly replying "Login incorrect", the Telnet honeypot *accepts* the login and drops the attacker into a believable Ubuntu 20.04 shell that answers common recon commands (`ls`, `cat /etc/passwd`, `uname -a`, `ps`, `ifconfig`, `wget`, …) while **logging every command they type** as a `Shell` event. Capturing the post-login command set reveals attacker TTPs and IOCs — which payloads they fetch, which binaries they try to run — that a credential-only honeypot never sees. Download/exec commands (`wget`/`curl`/`tftp`/`chmod +x`/`./…`) are flagged and escalated to a Telegram alert. Nothing is ever executed: responses are canned, the filesystem is fictional, and downloads are faked. Tunable via `TELNET_SHELL_ENABLE` / `TELNET_LOGIN_GRANT_ATTEMPT` in `config.h`.
 
 > **MAC address for every protocol.** Since the attacker is on the same local network, for each event ShadowSentry resolves their MAC via the lwIP ARP table and shows it together with a best-effort vendor guess (OUI). A randomized MAC (private, typical for smartphones) is flagged separately. The MAC is shown both in the dashboard and in the Telegram alert.
 
@@ -254,7 +256,8 @@ ShadowSentryS3/
     ├── honeypot/               ── Core 0 — Hacker World ──────────────
     │   ├── rtsp_trap.c/h       Port 554, Fake Hikvision, Base64 creds
     │   ├── http_trap.c/h       Port 80, Fake NVR login page
-    │   ├── telnet_trap.c/h     Port 23, Fake Ubuntu 20.04
+    │   ├── telnet_trap.c/h     Port 23, Fake Ubuntu 20.04 login
+    │   ├── fake_shell.c/h      Interactive post-login shell (command capture)
     │   ├── ssh_trap.c/h        Port 22, Fake OpenSSH, client fingerprint
     │   └── ftp_trap.c/h        Port 21, Fake vsFTPd 3.0.5, full creds
     ├── admin/                  ── Core 1 — Admin World ───────────────
@@ -277,6 +280,7 @@ Typical detection scenarios:
 | Threat | Behaviour | Detection time |
 |--------|-----------|----------------|
 | Mirai / Mozi botnet | Brute-force RTSP/Telnet/FTP | < 5 s |
+| Post-login intrusion | Commands run in the fake Telnet shell (recon, payload fetch) | per command |
 | Ransomware lateral movement | Subnet scanning | < 5 s |
 | SSH scanner | Version fingerprint on port 22 | < 1 s |
 | Web scanner | GET / on port 80 | < 1 s |

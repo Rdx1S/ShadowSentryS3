@@ -46,11 +46,13 @@ ShadowSentry S3 — автономний апаратний honeypot класу 
 |----------|---------------|---------|
 | RTSP | Username + Password | `admin:12345` з Basic Auth заголовку |
 | HTTP | Username + Password + **path + User-Agent** | POST-форма логіну NVR; кожен запит (GET/POST/інше) фінгерпринтиться за шляхом і User-Agent сканера |
-| Telnet | Username + Password | Інтерактивний login prompt (до 5 спроб) |
+| Telnet | Username + Password **+ команди після входу** | Login prompt, далі фейкова інтерактивна оболонка, що логує кожну команду |
 | SSH | Client version string | `SSH-2.0-OpenSSH_7.4p1 Debian-10` |
 | FTP | Username + Password | `USER admin` / `PASS password` (RFC 959) |
 
 > SSH не захоплює credentials — після обміну банерами весь трафік шифрується. Натомість version string є корисним fingerprint атакуючого.
+
+> **Інтерактивна фейкова оболонка (у стилі Cowrie).** Замість вічного «Login incorrect» Telnet-honeypot *приймає* логін і кидає атакуючого у правдоподібну оболонку Ubuntu 20.04, яка відповідає на типові recon-команди (`ls`, `cat /etc/passwd`, `uname -a`, `ps`, `ifconfig`, `wget`, …) і **логує кожну введену команду** як подію `Shell`. Захоплення набору команд після входу розкриває TTP та IOC атакуючого — які payload'и він качає, які бінарники намагається запустити — чого honeypot, що збирає лише креди, ніколи не побачить. Команди завантаження/запуску (`wget`/`curl`/`tftp`/`chmod +x`/`./…`) позначаються й ескалюються в Telegram-сповіщення. Нічого ніколи не виконується: відповіді захардкоджені, файлова система вигадана, завантаження фейкові. Налаштовується через `TELNET_SHELL_ENABLE` / `TELNET_LOGIN_GRANT_ATTEMPT` у `config.h`.
 
 > **MAC-адреса для всіх протоколів.** Оскільки атакуючий у тій самій локальній мережі, для кожної події ShadowSentry резолвить його MAC через ARP-таблицю lwIP і показує його разом зі здогадом про виробника (OUI). Рандомізований MAC (приватний, типовий для смартфонів) позначається окремо. MAC видно і в дашборді, і в Telegram-сповіщенні.
 
@@ -254,7 +256,8 @@ ShadowSentryS3/
     ├── honeypot/               ── Core 0 — Hacker World ──────────────
     │   ├── rtsp_trap.c/h       Port 554, Fake Hikvision, Base64 creds
     │   ├── http_trap.c/h       Port 80, Fake NVR login page
-    │   ├── telnet_trap.c/h     Port 23, Fake Ubuntu 20.04
+    │   ├── telnet_trap.c/h     Port 23, Fake Ubuntu 20.04 login
+    │   ├── fake_shell.c/h      Інтерактивна оболонка після входу (запис команд)
     │   ├── ssh_trap.c/h        Port 22, Fake OpenSSH, client fingerprint
     │   └── ftp_trap.c/h        Port 21, Fake vsFTPd 3.0.5, full creds
     ├── admin/                  ── Core 1 — Admin World ───────────────
@@ -277,6 +280,7 @@ ShadowSentryS3/
 | Загроза | Поведінка | Час виявлення |
 |---------|-----------|---------------|
 | Mirai / Mozi ботнет | Брутфорс RTSP/Telnet/FTP | < 5 сек |
+| Вторгнення після входу | Команди у фейковій Telnet-оболонці (recon, завантаження payload) | на кожну команду |
 | Ransomware lateral movement | Сканування підмережі | < 5 сек |
 | SSH-сканер | Version fingerprint port 22 | < 1 сек |
 | Веб-сканер | GET / на port 80 | < 1 сек |

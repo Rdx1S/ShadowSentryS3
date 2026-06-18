@@ -103,6 +103,16 @@
 #define SSH_PORT                    22      // SSH scanner version fingerprinting
 #define FTP_PORT                    21      // FTP bruteforce (USER/PASS plaintext)
 
+// ── Telnet fake shell (Cowrie-style) ───────────────────────────────────────────
+//
+// After the Telnet honeypot collects credentials it can "accept" the login and
+// drop the attacker into a fake Ubuntu shell that answers recon commands while
+// logging every command they run (ATTACK_SHELL events). Capturing the post-login
+// command set reveals attacker TTPs and IOCs a credential-only trap never sees.
+// Nothing is ever executed — responses are canned and the filesystem fictional.
+#define TELNET_SHELL_ENABLE         1       // 0 = stay a pure credential collector
+#define TELNET_LOGIN_GRANT_ATTEMPT  1       // accept the Nth login (1 = first try)
+
 // ── Storage ───────────────────────────────────────────────────────────────────
 //
 // Both files live in the "storage" SPIFFS partition (see partitions.csv).
