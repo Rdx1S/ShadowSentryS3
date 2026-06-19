@@ -112,14 +112,23 @@ static void on_wifi_event(void *arg, esp_event_base_t base,
             s_connected = false;
             s_disconnect_count++;          // observed by the Wi-Fi threat monitor
 
-            // Tell a deauth/disassoc-induced drop apart from a benign RF drop by
-            // the 802.11 reason code. A deauth frame (even a single spoofed one,
-            // enough to force a reconnect and capture the 4-way handshake) carries
-            // a low reason code (1-9). Benign losses report 200+ (beacon timeout,
-            // no-AP-found, handshake-timeout); code 8 (assoc-leave) is the AP's own
-            // roaming/teardown. So one deauth-attributable drop is already a signal.
+            // Tell a deauth/disassoc attack apart from a benign disconnect by the
+            // 802.11 reason code. Deauth tools (aireplay-ng / mdk4 / ESP deauthers)
+            // send low attack codes — 1 (unspecified), 2, 7 — and even a single
+            // spoofed frame forces a reconnect that can leak the 4-way handshake, so
+            // one such drop is already a signal. Excluded as benign (NOT attacks):
+            //   - reason >= 200 : local/internal RF failures (beacon timeout, no-AP,
+            //                     handshake-timeout, roaming) reported by our own radio
+            //   - 3 AUTH_LEAVE                : AP administratively tears down our auth
+            //   - 4 DISASSOC_DUE_TO_INACTIVITY: AP kicks an *idle* station — this fires
+            //                                   while the device just sits there, so
+            //                                   without this exclusion every idle-kick
+            //                                   looked like a deauth attack
+            //   - 8 ASSOC_LEAVE              : normal deassoc-due-to-leaving / roaming
             bool deauth_reason = (reason != 0 && reason < 200 &&
-                                  reason != WIFI_REASON_ASSOC_LEAVE);
+                                  reason != WIFI_REASON_AUTH_LEAVE &&                 // 3
+                                  reason != WIFI_REASON_DISASSOC_DUE_TO_INACTIVITY && // 4
+                                  reason != WIFI_REASON_ASSOC_LEAVE);                 // 8
             if (deauth_reason) {
                 s_deauth_disc_count++;
             }
@@ -215,6 +224,15 @@ void wifi_manager_init(void)
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg));
     ESP_ERROR_CHECK(esp_wifi_start());
+
+    // Disable Wi-Fi modem-sleep. This device is mains-powered and always-on, so
+    // power-save buys nothing — and a sleeping STA looks "inactive" to the AP,
+    // which then periodically evicts it (seen here as a reason=2 AUTH_EXPIRE drop
+    // every ~20 min of idle). The Wi-Fi threat monitor would flag each such
+    // eviction as a deauth attack, so keeping the radio awake removes that
+    // false-positive at its source while leaving real deauth detection intact.
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+
     // esp_wifi_connect() is called from on_wifi_event on WIFI_EVENT_STA_START
 }
 

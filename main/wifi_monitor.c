@@ -36,9 +36,10 @@
 // attack targeting THIS device. This is the reliable detector: a deauth knocks
 // us off-channel (so passive sniffing sees almost nothing), but we always observe
 // our own disconnect — and wifi_manager classifies it by 802.11 reason code, so
-// benign RF drops (beacon-timeout / no-AP, reason 200+) are NOT counted. A single
-// spoofed deauth is enough to force a reconnect and capture the handshake, so the
-// default threshold is 1: we alert on the first deauth-attributable drop.
+// benign drops are NOT counted: local RF failures (beacon-timeout / no-AP, 200+)
+// and AP-initiated administrative kicks (reason 4 inactivity, 3 auth-leave, 8
+// leave). A single spoofed deauth is enough to force a reconnect and capture the
+// handshake, so the default threshold is 1: we alert on the first attack-coded drop.
 #define WIFI_MON_DEAUTH_DISC_THRESHOLD 1
 #endif
 #ifndef WIFI_MON_COOLDOWN_S
