@@ -114,3 +114,14 @@ bool wifi_manager_get_gateway(uint32_t *gw_net);
 // walk is marshalled into the lwIP TCP/IP thread via tcpip_callback(), the same
 // way wifi_manager_lookup_mac() is. Used by the ARP-spoof / MITM monitor.
 int wifi_manager_arp_snapshot(wifi_arp_entry_t *out, int max);
+
+// Actively re-verify a suspected ARP-spoof pair before alerting. Flushes the ARP
+// cache, broadcasts fresh who-has requests for both IPs (and the gateway, so the
+// uplink re-resolves promptly), waits briefly for replies, then re-resolves both.
+// Returns true only if BOTH IPs answer and still map to `mac` — i.e. one host is
+// actively defending two addresses (real poisoning). A host that merely changed
+// DHCP lease will not answer for its old IP, so the stale mapping drops out and
+// this returns false. Blocks ~1 s — call only from a low-priority task (the ARP
+// monitor) and only when a suspicious pair is actually found.
+bool wifi_manager_arp_confirm_pair(uint32_t ip1_net, uint32_t ip2_net,
+                                   const uint8_t mac[6]);

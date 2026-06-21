@@ -371,6 +371,62 @@ int wifi_manager_arp_snapshot(wifi_arp_entry_t *out, int max)
     return q.count;
 }
 
+// ── Active ARP re-verification ────────────────────────────────────────────────
+// lwIP keeps a STABLE cache entry for an IP a host has abandoned (e.g. after a
+// DHCP lease change) for minutes, so a passive snapshot can show one MAC on two
+// IPs and look like poisoning when it is just churn. Before alerting, flush the
+// cache and actively re-request both IPs: only a host still defending both will
+// answer for both; a moved host won't answer for its old IP.
+
+#define ARP_REVERIFY_WAIT_MS 1000   // time for who-has replies to repopulate
+
+typedef struct {
+    ip4_addr_t        ip1, ip2, gw;
+    bool              have_gw;
+    SemaphoreHandle_t done;
+} arp_reverify_t;
+
+static void arp_reverify_kick_cb(void *arg)
+{
+    arp_reverify_t *q = (arp_reverify_t *)arg;
+    struct netif *nif = s_sta_netif
+        ? (struct netif *)esp_netif_get_netif_impl(s_sta_netif) : NULL;
+    if (nif) {
+        etharp_cleanup_netif(nif);                    // drop all dynamic entries
+        if (q->have_gw) etharp_request(nif, &q->gw);  // restore the uplink ASAP
+        etharp_request(nif, &q->ip1);                 // who really owns these now?
+        etharp_request(nif, &q->ip2);
+    }
+    xSemaphoreGive(q->done);
+}
+
+bool wifi_manager_arp_confirm_pair(uint32_t ip1_net, uint32_t ip2_net,
+                                   const uint8_t mac[6])
+{
+    if (!s_sta_netif) return false;
+
+    // Phase 1 — flush the cache and broadcast fresh who-has for both IPs.
+    arp_reverify_t q = { .have_gw = false };
+    q.ip1.addr = ip1_net;
+    q.ip2.addr = ip2_net;
+    uint32_t gw;
+    if (wifi_manager_get_gateway(&gw)) { q.gw.addr = gw; q.have_gw = true; }
+    q.done = xSemaphoreCreateBinary();
+    if (!q.done) return false;
+    if (tcpip_callback(arp_reverify_kick_cb, &q) == ERR_OK)
+        xSemaphoreTake(q.done, portMAX_DELAY);
+    vSemaphoreDelete(q.done);
+
+    // Phase 2 — give the real owners time to answer.
+    vTaskDelay(pdMS_TO_TICKS(ARP_REVERIFY_WAIT_MS));
+
+    // Phase 3 — re-resolve both; confirmed only if both still map to `mac`.
+    uint8_t m1[6], m2[6];
+    bool f1 = wifi_manager_lookup_mac(ip1_net, m1);
+    bool f2 = wifi_manager_lookup_mac(ip2_net, m2);
+    return f1 && f2 && memcmp(m1, mac, 6) == 0 && memcmp(m2, mac, 6) == 0;
+}
+
 void wifi_manager_format_mac(const uint8_t mac[6], char *buf, size_t len)
 {
     static const uint8_t zero[6] = {0};

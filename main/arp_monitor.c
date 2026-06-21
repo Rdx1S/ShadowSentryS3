@@ -117,6 +117,12 @@ void arp_monitor_task(void *arg)
         }
 
         // ── Check 2: one MAC claiming multiple IPs ──────────────────────────
+        // A snapshot can show one MAC on two IPs simply because a host changed
+        // DHCP lease and lwIP still holds the stale-but-STABLE old mapping. So
+        // before alerting we actively re-verify the pair (flush + re-request both
+        // IPs, require both to answer with the same MAC). The verify costs ~1s and
+        // flushes the ARP cache, so do at most one per scan, and skip it entirely
+        // for a MAC already alerted within the cooldown.
         for (int i = 0; i < n; i++) {
             if (mac_is_zero(tbl[i].mac)) continue;
             for (int j = i + 1; j < n; j++) {
@@ -128,12 +134,26 @@ void arp_monitor_task(void *arg)
                 struct in_addr a2 = {.s_addr = tbl[j].ip};
                 strlcpy(ip1, inet_ntoa(a1), sizeof(ip1));
                 strlcpy(ip2, inet_ntoa(a2), sizeof(ip2));
-                char detail[128];
-                snprintf(detail, sizeof(detail),
-                         "MAC %s claims %s and %s (ARP cache poisoning)",
-                         ms, ip1, ip2);
-                raise_alert(tbl[i].ip, tbl[i].mac, detail);
-                i = n;          // one report per scan is enough
+
+                // Already alerted on this MAC recently — don't churn the cache.
+                if (mac_eq(tbl[i].mac, s_last_mac) &&
+                    (time(NULL) - s_last_alert) < ARP_ALERT_COOLDOWN_S) {
+                    i = n;
+                    break;
+                }
+
+                if (wifi_manager_arp_confirm_pair(tbl[i].ip, tbl[j].ip, tbl[i].mac)) {
+                    char detail[128];
+                    snprintf(detail, sizeof(detail),
+                             "MAC %s claims %s and %s (ARP cache poisoning)",
+                             ms, ip1, ip2);
+                    raise_alert(tbl[i].ip, tbl[i].mac, detail);
+                } else {
+                    ESP_LOGI(TAG, "MAC %s on %s and %s not confirmed live "
+                             "(stale entry / DHCP lease change) — ignoring",
+                             ms, ip1, ip2);
+                }
+                i = n;          // one verification (and at most one report) per scan
                 break;
             }
         }
